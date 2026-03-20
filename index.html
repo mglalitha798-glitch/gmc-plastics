@@ -1,0 +1,2749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>GMC Plastics PMS v6</title>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#060C18;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+body{color:#E2EAF4;font-family:'DM Sans',sans-serif;font-size:14px}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#0B1628}::-webkit-scrollbar-thumb{background:#1E3A5F;border-radius:4px}
+input,select,textarea,button{font-family:inherit;-webkit-appearance:none;appearance:none}
+select option{background:#0A0F1E;color:#E2EAF4}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideRight{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.fu{animation:fadeUp 0.2s ease both}
+.sr{animation:slideRight 0.22s ease both}
+.pu{animation:pulse 1.5s ease infinite}
+.spin{animation:spin 0.7s linear infinite;display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;vertical-align:middle}
+button:active{transform:scale(0.97)}
+textarea{resize:vertical}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,useMemo}=React;
+
+// ═══════════════════════════════════
+// SUPABASE
+// ═══════════════════════════════════
+const SURL='https://puwvywwysdbgyhcypocc.supabase.co';
+const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB1d3Z5d3d5c2RiZ3loY3lwb2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5OTkzNTAsImV4cCI6MjA4OTU3NTM1MH0.mcmpLm5sKZbzwPcHW_uWyjJCj_uyp3SlAXNoChXWft0';
+const SB=window.supabase.createClient(SURL,SKEY);
+
+// ═══════════════════════════════════
+// ANTHROPIC API (for AI features)
+// ═══════════════════════════════════
+const AI_CALL=async(prompt,systemMsg="You are a senior plastic surgeon at Grant Medical College Mumbai. Respond in professional medical language suitable for Indian medical documentation.")=>{
+  const r=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      model:"claude-sonnet-4-20250514",
+      max_tokens:1000,
+      system:systemMsg,
+      messages:[{role:"user",content:prompt}]
+    })
+  });
+  const d=await r.json();
+  return d.content?.map(c=>c.text||"").join("")||"";
+};
+
+// ═══════════════════════════════════
+// USERS
+// ═══════════════════════════════════
+// Users loaded from Supabase app_users table
+
+const LS={
+  g:(k,fb)=>{try{const d=localStorage.getItem(k);return d?JSON.parse(d):fb;}catch{return fb;}},
+  s:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+};
+
+// ═══════════════════════════════════
+// UNIQUE IPD ID GENERATOR
+// Format: GMC/PLAST/YYYY/NNNNN
+// ═══════════════════════════════════
+const genIPD=()=>{
+  const yr=new Date().getFullYear();
+  const seq=LS.g('gmc_seq',1000);
+  LS.s('gmc_seq',seq+1);
+  return `GMC/PLAST/${yr}/${String(seq).padStart(5,'0')}`;
+};
+
+// ═══════════════════════════════════
+// PROTOCOLS DATABASE
+// ═══════════════════════════════════
+const DP={
+  "Facial Fracture - Panfacial":{color:"#EF5350",category:"Trauma",
+    investigations:["CBC with differential","BMP: RFT, LFT, Electrolytes","Coagulation: PT, INR, aPTT","Blood group & cross-match (2 PRBC)","HbsAg, Anti-HCV, HIV ELISA","ECG 12-lead","Chest X-Ray PA","HRCT Face: axial + coronal + 3D","CT Brain plain","Ophthalmology: VA & fundus","Neurosurgery consult if needed"],
+    preop_checklist:["Consent with photographs obtained","2 PRBC cross-matched","Airway: anticipate difficult","Large bore IV x2","Foley planned","Head-end 30°","Dexamethasone 8mg IV planned"],
+    preop_orders:["Inj. Ceftriaxone 1g IV stat","Inj. Dexamethasone 8mg IV","Inj. Ondansetron 4mg IV","IV: 18G NS at KVO","NBM from midnight","Alert anaesthesia: difficult airway"],
+    special_consent:["Blood transfusion","Facial nerve injury risk","Vision change / blindness","Malocclusion / bite change","Hardware palpability / removal","Scar / keloid","Re-operation risk"],
+    materials:["Titanium micro plates 1.0mm","Titanium mini plates 1.5mm & 2.0mm","Titanium mesh 0.4mm orbital floor","Screws 4/6/8mm","Erich arch bars x2","IMF screws 1.5mm x20","3-0 Vicryl, 4-0 Nylon, 5-0 PDS","Corneal shields","Throat pack","Power drill + bur set","Rowe's forceps, Freer elevator"],
+    intraop:["Power drill & bur","Titanium plates & screws","Arch bars + IMF screws","Nerve stimulator","Loupes x2","Corneal shields","Throat pack"],
+    postop:["Inj. Ceftriaxone 1g BD x5d","Inj. Metronidazole 500mg TDS x5d","Inj. Dexamethasone taper x3d","Chlorhexidine mouthwash TDS","Soft diet x6w","Ice packs 20min q2h x48h","Ophthal review D1","Suture removal D7-10"],
+    rehab:["D1-3: Head elevation 30°, ice packs","W1-2: Jaw exercises (if no IMF), gentle ROM","W3-6: Soft diet, speech therapy if needed","W6-12: Gradual return to normal diet","3mo: Final occlusion check, scar massage","6mo: Review for hardware removal if needed"],
+    references:["Manson PN - Facial Fractures Grabb & Smith 8th Ed","ATLS Primary & Secondary Survey","AO CMF - aosurgery.org","Ophthalmology referral: Visual acuity & fundus - rule out retrobulbar haematoma, globe injury, traumatic optic neuropathy","ENT referral: CSF rhinorrhoea, septal haematoma, nasal bone fracture assessment","Neurosurgery referral: Intracranial haemorrhage, base of skull fracture, GCS <14","IDL (Indirect Laryngoscopy): Mandible/panfacial fractures - airway assessment","Rowe & Williams - Maxillofacial Injuries 2nd Ed","Zide & Swift - Surgical Anatomy Around the Orbit"]},
+  "STSG - Split Thickness Skin Graft":{color:"#42A5F5",category:"Reconstruction",
+    investigations:["CBC, BMP, Blood sugar fasting & PP","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Wound swab C/S","Blood group & cross-match","Albumin & Pre-albumin","HbA1c if diabetic"],
+    preop_checklist:["Wound bed: clean granulation","C/S reviewed","Albumin >3g/dL","FBS <180","Pre-op wound photos","Donor site marked (ALT)","Mesher available"],
+    preop_orders:["Inj. Cefazolin 1g IV stat","Blood sugar check morning","Mark donor site","NBM from midnight","IV 18G RL 100ml/hr"],
+    special_consent:["Graft failure / partial take","Donor site scar","Hypertrophic scar / contracture","Re-grafting if needed","Compression garment 6m"],
+    materials:["Humby/Watson knife","Dermatome 0.012-0.015 inch","Mesher + carrier 1:1.5 or 1:3","Mineral oil","Stapler","4-0 Nylon tie-over","Paraffin gauze Jelonet","Mepilex Ag / Aquacel Ag","NPWT/VAC"],
+    intraop:["Humby/Watson knife","Mesher + carrier","Mineral oil","Stapler","4-0 Nylon tie-over","Aquacel Ag"],
+    postop:["NPWT x5-7d, DO NOT disturb","Donor dressing D10-14","Elevate limb","Graft check D5","Compression garment W3 x6m","Physio ROM D7"],
+    rehab:["D5-7: First dressing change, assess take","W2-3: Begin gentle ROM exercises","W3: Start compression garment fitting","W4-8: Scar massage with moisturiser","3mo: Review scar, consider silicone sheets","6mo: Final review, ongoing pressure therapy"],
+    references:["Ratner D - Skin Grafting Dermatol Clin 1998","Chang LK - Modern Wound Management PRS 2016"]},
+  "Post-Burn Contracture Release":{color:"#FF8F00",category:"Burns & Contracture",
+    investigations:["CBC, BMP, Blood sugar","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Blood group & cross-match","Doppler if vascular compromise","Wound swab C/S","Albumin","X-ray of joint"],
+    preop_checklist:["Contracture grade I-IV documented","ROM measured pre-op","Albumin >3g/dL","CRITICAL: airway if neck","Graft/flap decision made","Splint fabricated pre-op"],
+    preop_orders:["Inj. Cefazolin 1g IV","Tourniquet 250mmHg for limb","Splint ready in OT","NBM midnight","Mark release and donor site"],
+    special_consent:["Incomplete release risk","Graft failure","Donor site scar","Recurrence esp. paediatric","Long-term splinting 3-6m"],
+    materials:["Humby knife / dermatome","Mesher","Callipers for Z-plasty","K-wires for joints","Thermoplastic splint","Aquacel Ag / Mepilex Ag","NPWT"],
+    intraop:["Dermatome","Mesher","Callipers + ruler","Splint ready","K-wires if needed","NPWT/VAC"],
+    postop:["Splint corrected position x3-6w","Physio ROM D7 supervised","Compression garment 3w","Silicone gel 6w","Pressure therapy x12-18m"],
+    rehab:["D1-7: Immobilise in corrected position","W1-3: Begin supervised ROM exercises","W3-6: Progressive strengthening","W6-12: Functional activities, scar management","3mo: Compression garment review","6-18mo: Ongoing pressure therapy and splinting"],
+    references:["Wainwright DJ - Post-Burn Scar Management 2009"]},
+  "Burns - Acute Management":{color:"#FF5722",category:"Burns & Contracture",
+    investigations:["CBC with differential","BMP: electrolytes critical","ABG if inhalation","Coagulation profile","Blood group & cross-match","Urine myoglobin","Foley: hourly UO","CXR inhalation screen","COHb if smoke"],
+    preop_checklist:["TBSA calculated (Rule of Nines)","Depth classified","Parkland formula started","50% in first 8h FROM BURN TIME","Airway secured if face/neck","Tetanus given","Escharotomy if circumferential"],
+    preop_orders:["Two large bore IVs Hartmann's Parkland","Foley hourly UO chart","Inj. Morphine 0.1mg/kg IV","Inj. Tetanus toxoid","Warm OT >28°C","NGT if >20% TBSA"],
+    special_consent:["TBSA and depth explained","Baux score mortality","Multiple surgeries likely","Scarring and contractures","Blood transfusion"],
+    materials:["Humby/Watson dermatome","Mesher 1:3","Mepilex Ag / Aquacel Ag","Stapler","NPWT/VAC","Warm saline packs","Cell saver if >40% TBSA"],
+    intraop:["Dermatome","Mesher","Silver dressings","Stapler","NPWT/VAC","Warm saline packs"],
+    postop:["Strict I/O UO >0.5ml/kg/hr","Burns chart daily","Early enteral feeding 6h","Physio from D1","Wound swab C/S q48h"],
+    rehab:["Acute: Early mobilisation from D1-2","W2-4: Active ROM all joints","W4-8: Splinting at night, compression garments","3mo: Intensive scar management","6mo-2yr: Pressure garments, serial splinting","Long-term: Psychological support, return to work"],
+    references:["ABA Guidelines 2023","Herndon DN - Total Burn Care 5th Ed"]},
+  "Gynaecomastia Surgery":{color:"#26A69A",category:"Aesthetic & Body",
+    investigations:["CBC, BMP, LFT, RFT","Coagulation","HbsAg, Anti-HCV, HIV ELISA","Testosterone, E2, LH, FSH, Prolactin, TSH","FNAC if suspicious","USG chest bilateral"],
+    preop_checklist:["Simon's grade documented","Cause identified","Pre-op photos AP/lateral/oblique","Compression vest arranged"],
+    preop_orders:["Inj. Cefazolin 1g IV","Tumescent: 500ml NS+1mg Adr+20ml Xylocaine","Mark periareolar + liposuction","NBM midnight"],
+    special_consent:["Recurrence","Nipple-areola necrosis","Asymmetry","Seroma/haematoma","Sensory change"],
+    materials:["Liposuction cannulas 3-4mm","Tumescent cannula","No.15 blade","Bipolar","Blake drain","3-0 Vicryl, 4-0 Monocryl","Compression vest"],
+    intraop:["Liposuction cannulas","Tumescent solution","No.15 blade","Bipolar","Suction drain","Compression vest"],
+    postop:["Compression vest x6w","Drain <30ml/24h","Diclofenac BD x2d","Amox-Clav x5d","No strenuous activity x6w"],
+    rehab:["D1-14: Wear compression vest 24h","W2-6: Vest daytime, light activity","W6+: Resume exercise, no vest needed","Scar massage from W3","Review 1m, 3m, 6m"],
+    references:["Simon BE - Gynaecomastia Classification PRS 1973"]},
+  "Breast Reduction":{color:"#EC407A",category:"Aesthetic & Body",
+    investigations:["CBC, BMP, Coagulation","HbsAg, Anti-HCV, HIV ELISA","Blood group cross-match","Mammography if >35y","USG breast bilateral","Cardiac if BMI >35"],
+    preop_checklist:["SN-nipple distance bilateral","Ptosis grade documented","Photos standing","DVT: TED + LMWH planned"],
+    preop_orders:["Inj. Cefazolin 1g IV","Inj. LMWH Enoxaparin 40mg SC","TED stockings pre-induction","Markings standing","NBM midnight"],
+    special_consent:["Nipple loss","Asymmetry","T-junction breakdown","Permanent scars","Lactation impaired","DVT/PE"],
+    materials:["Wise/vertical template","Callipers","Bipolar","3-0 Vicryl, 3-0 PDS, 4-0 Monocryl","Blake drains bilateral","Surgical bra"],
+    intraop:["Template + callipers","Bipolar","Vicryl/PDS/Monocryl","Blake drains","Surgical bra"],
+    postop:["Surgical bra x6w","Drains <30ml/day","LMWH x5d","Amox-Clav x5d","Silicone gel 3w"],
+    rehab:["D1-14: Surgical bra 24h, avoid raising arms","W2-6: Gentle arm ROM, no heavy lifting","W6+: Resume normal activity","Scar massage from W3","Silicone sheets 3-6m","Annual mammography"],
+    references:["Hall-Findlay EJ - Reduction Mammoplasty 2nd Ed"]},
+  "Cleft Lip - Primary Repair":{color:"#66BB6A",category:"Congenital",
+    investigations:["CBC, BMP","Blood group cross-match","HbsAg, Anti-HCV, HIV ELISA","Weight, nutrition, feeding","URTI screening","Cardiac echo mandatory","Hb ≥10g/dL"],
+    preop_checklist:["Rule of 10s: ≥10w, ≥10lbs, Hb ≥10","No URTI 2 weeks","Cardiac clearance","Millard/Fisher markings","Pre-op photos","Arm splints prepared"],
+    preop_orders:["Paediatric IV 22G","IV DNS maintenance","Inj. Ampicillin 25mg/kg IV","Arm splints before extubation","No suckling post-op","Warm OT"],
+    special_consent:["Revisional surgery adolescence","Permanent scar on lip","Asymmetry","Wound dehiscence","Secondary nasal surgery","Orthodontic treatment"],
+    materials:["Callipers + ruler","No.15 blade","Iris scissors","Skin hooks x4","4-0 Vicryl, 5-0 PDS, 6-0 Monocryl","Logan's bow","Arm/elbow splints"],
+    intraop:["Callipers + ruler","No.15 blade","Iris scissors","Vicryl/PDS/Monocryl","Logan's bow","Arm splints"],
+    postop:["Arm restraints x4w","Syringe/cup feeding x2w","Wound: saline + antibiotic ointment BD","Paracetamol suspension","Review D7, 1m, 3m, 1y"],
+    rehab:["D1-14: Arm restraints, syringe feeding","W2-4: Lip massage begins","3mo: Scar massage with Vaseline","6-12mo: Monitor scar, orthodontic referral","5-6yr: Secondary nasal correction","16-18yr: Final rhinoplasty if needed"],
+    references:["Millard DR - Cleft Craft Vol 1","Fisher DM - Unilateral Cleft Lip PRS 2005"]},
+  "Lower 1/3 Face - Free Flap":{color:"#7E57C2",category:"Oncoplastic",
+    investigations:["CBC, BMP, LFT, RFT","Coagulation","Blood group 2PRBC+2FFP","Biopsy/HPE","CECT Head & Neck","PET CT","2D Echo","CTA/MRA neck vessels","Doppler ALT + Allen's test","MDT clearance","Albumin, BMI"],
+    preop_checklist:["MDT clearance","Vessel mapping done","Donor site marked","Two-team briefed","ICU bed confirmed","Tracheostomy consent","NG tube planned"],
+    preop_orders:["Admit HDU night before","IV x2 + arterial line","Inj. Ceftriaxone + Metronidazole IV","Inj. LMWH","ICU confirmed"],
+    special_consent:["Flap failure","Tracheostomy","NG feeding 4-6w","Donor morbidity","Total flap loss","Speech rehab"],
+    materials:["Operating microscope","Microsurgery set","Anastomosis coupler 2.5-3mm","Intraop Doppler","Bipolar fine tip","Loupes x2","Prolene 8-0, 9-0","Heparinised saline"],
+    intraop:["Microsurgery set","Operating microscope","Anastomosis coupler","Intraop Doppler","Prolene 8-0/9-0","Heparinised saline"],
+    postop:["ICU x48-72h","Hourly flap monitoring","Inj. Heparin SC BD","Tab. Aspirin 75mg","NG feeding 6h post-op","NO pressure on pedicle"],
+    rehab:["W1-4: Speech therapy, NG feeding","W4-6: Oral feeding trials","2mo: Swallowing assessment","3mo: Oncology follow-up, imaging","6mo: Functional assessment","1yr: Final oncology review"],
+    references:["Wei FC Mardini S - Flaps & Reconstructive Surgery 2nd Ed"]},
+};
+
+const PRIO={Emergency:{c:"#EF5350",i:"🚨"},Urgent:{c:"#FF7043",i:"⚡"},"Semi-Urgent":{c:"#FFA726",i:"🔶"},Elective:{c:"#66BB6A",i:"📋"}};
+const WARDS=["Ward 9A - Plastics Male","Ward 9B - Plastics Female","Ward 9C - Burns","ICU / HDU","PACU / Recovery","OPD / Outpatient","Emergency Dept."];
+
+const C={bg:"#060C18",panel:"#0B1628",card:"#0F1E36",b:"#162847",accent:"#3B82F6",t:"#E2EAF4",sub:"#5E7A9E",mu:"#3B5278",ok:"#22C55E",warn:"#F59E0B",err:"#EF4444",teal:"#14B8A6",purple:"#A855F7"};
+
+// ═══════════════════════════════════
+// DATABASE
+// ═══════════════════════════════════
+const DB={
+  async getPts(){const{data,error}=await SB.from('patients').select('*').order('created_at',{ascending:false});if(!error&&data)return data.map(r=>({...r.data,_dbRow:true}));return LS.g('pts_v6',[]);},
+  async savePt(p){const row={id:p.id,data:{...p},created_at:p.created_at||new Date().toISOString()};await SB.from('patients').upsert(row,{onConflict:'id'});const all=LS.g('pts_v6',[]);LS.s('pts_v6',[p,...all.filter(x=>x.id!==p.id)]);return p;},
+  async delPt(id){await SB.from('patients').delete().eq('id',id);LS.s('pts_v6',LS.g('pts_v6',[]).filter(p=>p.id!==id));},
+  async getProtos(){const{data}=await SB.from('protocols').select('*');if(data&&data.length){const o={};data.forEach(r=>o[r.name]=r.data);return o;}return LS.g('protos_v6',DP);},
+  async saveProtos(pr){const rows=Object.entries(pr).map(([name,data])=>({name,data}));await SB.from('protocols').upsert(rows,{onConflict:'name'});LS.s('protos_v6',pr);},
+  async uploadFile(path,file){
+    const ext=file.name.split('.').pop()||'jpg';
+    const fp=`${path}_${Date.now()}.${ext}`;
+    const{error}=await SB.storage.from('patient-photos').upload(fp,file,{contentType:file.type,upsert:true});
+    if(error){return new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(file);});}
+    const{data:u}=SB.storage.from('patient-photos').getPublicUrl(fp);return u.publicUrl;
+  },
+  getChks:(pid)=>LS.g('chk_'+pid,{}),setChks:(pid,v)=>LS.s('chk_'+pid,v),
+  getPhotos:(pid)=>LS.g('pho_'+pid,{preop:[],intraop:[],postop:[],inv:{}}),
+  setPhotos:(pid,v)=>LS.s('pho_'+pid,v),
+  getOrders:(pid)=>LS.g('ord_'+pid,[]),setOrders:(pid,v)=>LS.s('ord_'+pid,v),
+  getDS:(pid)=>LS.g('ds_'+pid,{}),setDS:(pid,v)=>LS.s('ds_'+pid,v),
+  getLogbook:()=>LS.g('gmc_logbook',[]),
+  addLogEntry:(entry)=>{const lb=LS.g('gmc_logbook',[]);LS.s('gmc_logbook',[{...entry,id:Date.now(),addedAt:new Date().toISOString()},...lb]);},
+};
+
+// ═══════════════════════════════════
+// STYLES
+// ═══════════════════════════════════
+const S={
+  card:(extra={})=>({background:C.card,border:`1px solid ${C.b}`,borderRadius:12,padding:16,marginBottom:10,...extra}),
+  inp:{background:C.bg,border:`1px solid ${C.b}`,borderRadius:10,padding:"10px 14px",color:C.t,fontSize:14,width:"100%",outline:"none"},
+  sel:{background:C.bg,border:`1px solid ${C.b}`,borderRadius:10,padding:"10px 14px",color:C.t,fontSize:14,width:"100%",outline:"none"},
+  ta:{background:C.bg,border:`1px solid ${C.b}`,borderRadius:10,padding:"10px 14px",color:C.t,fontSize:14,width:"100%",outline:"none",resize:"vertical",lineHeight:1.5},
+  lbl:{fontSize:11,color:C.sub,marginBottom:5,display:"block",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.5px"},
+  btn:(v="p",full)=>({
+    padding:"11px 18px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,
+    fontFamily:"inherit",width:full?"100%":"auto",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7,
+    background:v==="p"?`linear-gradient(135deg,#1D4ED8,${C.accent})`:v==="g"?"#166534":v==="r"?"#991B1B":v==="y"?"#92400E":v==="teal"?C.teal:v==="pur"?"#7C3AED":v==="ghost"?"transparent":C.card,
+    color:"#fff",border:v==="ghost"?`1px solid ${C.b}`:"none",transition:"opacity 0.15s"
+  }),
+  btnSm:(v="p")=>({padding:"6px 12px",borderRadius:8,border:"none",cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"inherit",display:"inline-flex",alignItems:"center",gap:5,
+    background:v==="p"?`${C.accent}25`:v==="g"?"rgba(22,101,52,0.3)":v==="r"?"rgba(153,27,27,0.3)":v==="y"?"rgba(146,64,14,0.3)":v==="teal"?`${C.teal}25`:v==="pur"?`${C.purple}25`:"transparent",
+    color:v==="p"?C.accent:v==="g"?"#4ADE80":v==="r"?"#F87171":v==="y"?"#FCD34D":v==="teal"?C.teal:v==="pur"?C.purple:C.sub,
+    border:`1px solid ${v==="p"?C.accent+"40":v==="g"?"#4ADE8040":v==="r"?"#F8717140":v==="y"?"#FCD34D40":v==="teal"?C.teal+"40":v==="pur"?C.purple+"40":C.b}`
+  }),
+  bdg:(p)=>({display:"inline-flex",alignItems:"center",gap:3,padding:"3px 9px",borderRadius:20,fontSize:12,fontWeight:700,background:`${PRIO[p]?.c}20`,color:PRIO[p]?.c,border:`1px solid ${PRIO[p]?.c}35`}),
+  pil:(col,sm)=>({display:"inline-flex",alignItems:"center",padding:sm?"2px 8px":"4px 11px",borderRadius:20,fontSize:sm?11:12,fontWeight:600,background:`${col}18`,color:col,border:`1px solid ${col}30`}),
+  chkrow:(done)=>({display:"flex",alignItems:"flex-start",gap:10,padding:"10px 12px",borderRadius:10,marginBottom:5,background:done?"rgba(34,197,94,0.07)":"rgba(59,130,246,0.03)",border:`1px solid ${done?"#22C55E35":C.b}`,cursor:"pointer",transition:"background 0.15s"}),
+  g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12},
+  ovl:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.88)",zIndex:300,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"16px 12px",overflowY:"auto"},
+  box:(w=800)=>({background:C.panel,border:`1px solid ${C.b}`,borderRadius:16,padding:20,width:"100%",maxWidth:w}),
+  sh:{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",background:C.bg,borderRadius:10,marginBottom:8,cursor:"pointer",border:`1px solid ${C.b}`,userSelect:"none"},
+  dv:{height:1,background:C.b,margin:"14px 0"},
+  navItem:(a)=>({display:"flex",alignItems:"center",gap:12,padding:"14px 20px",cursor:"pointer",borderLeft:a?`3px solid ${C.accent}`:`3px solid transparent`,background:a?`${C.accent}10`:"transparent",color:a?C.accent:C.sub,fontSize:14,fontWeight:a?700:500,transition:"all 0.15s"}),
+};
+const CB=({chk,on})=>(
+  <div onClick={on} style={{width:20,height:20,borderRadius:6,border:`2px solid ${chk?"#22C55E":C.mu}`,background:chk?"#22C55E":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1,cursor:"pointer",transition:"all 0.15s"}}>
+    {chk&&<span style={{color:"#fff",fontSize:11,fontWeight:900}}>✓</span>}
+  </div>
+);
+const Sp=({h=10})=><div style={{height:h}}/>;
+const L=({t})=><label style={S.lbl}>{t}</label>;
+const Tag=({label,color=C.accent})=><span style={{padding:"2px 9px",borderRadius:6,fontSize:11,fontWeight:600,background:`${color}18`,color,border:`1px solid ${color}25`}}>{label}</span>;
+
+// ═══════════════════════════════════
+// AI FEATURE PANEL
+// ═══════════════════════════════════
+function AIPanel({patient,protos,onClose}){
+  const [mode,setMode]=useState(null);
+  const [result,setResult]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [extra,setExtra]=useState("");
+  const proto=protos[patient.diagnosis]||{};
+
+  const run=async(promptFn)=>{
+    setBusy(true);setResult("");
+    try{const r=await promptFn();setResult(r);}
+    catch(e){setResult("Error: "+e.message);}
+    setBusy(false);
+  };
+
+  const FEATURES=[
+    {id:"casesheet",icon:"📄",label:"Case Sheet",color:C.accent,
+     prompt:()=>AI_CALL(`Generate a complete clinical case sheet for the following patient at GMC Mumbai Plastic Surgery department:
+Patient: ${patient.name}, Age: ${patient.age}y, Gender: ${patient.gender}
+Diagnosis: ${patient.diagnosis}
+Ward: ${patient.ward}, IPD: ${patient.id}
+Admitted: ${patient.admitDate}
+Clinical Notes: ${patient.notes||"Not provided"}
+Extra info: ${extra}
+Format as a proper hospital case sheet with: Chief Complaint, History of Presenting Illness, Past History, Family History, Personal History, Examination findings (General + Local), Provisional Diagnosis, Differential Diagnosis, Investigations Required, Management Plan.`)},
+    {id:"otnotes",icon:"🔪",label:"OT Notes",color:"#EF5350",
+     prompt:()=>AI_CALL(`Generate complete operative notes for the following plastic surgery procedure at GMC Mumbai:
+Patient: ${patient.name}, ${patient.age}y/${patient.gender}, IPD: ${patient.id}
+Procedure: ${patient.diagnosis}
+Surgeon: Dr. ${patient.resident}
+Extra operative details provided: ${extra}
+Protocol intraop requirements: ${(proto.intraop||[]).join(", ")}
+Generate: Date, Patient position, Anaesthesia, Preparation & draping, Incision, Steps of procedure (detailed), Intraop findings, Closure, Specimens sent, Blood loss estimate, Post-op instructions. Use formal operative note format.`)},
+    {id:"discharge",icon:"🏥",label:"DC Summary",color:"#22C55E",
+     prompt:()=>AI_CALL(`Generate a complete discharge summary for:
+Patient: ${patient.name}, ${patient.age}y/${patient.gender}, IPD: ${patient.id}
+Diagnosis: ${patient.diagnosis}
+Admitted: ${patient.admitDate}, Ward: ${patient.ward}
+Procedure done: ${patient.diagnosis}
+Resident: Dr. ${patient.resident}
+Post-op orders from protocol: ${(proto.postop||[]).join("; ")}
+Additional clinical info: ${extra}
+Format: Chief Complaint, History, Examination, Investigations, Diagnosis, Treatment Given, Procedure Details, Course in Hospital, Condition at Discharge, Advice on Discharge (medications list), Follow-up date. GMC Mumbai letterhead format.`)},
+    {id:"rehab",icon:"🏃",label:"Rehab Protocol",color:C.teal,
+     prompt:()=>AI_CALL(`Generate a detailed rehabilitation protocol for a patient who underwent ${patient.diagnosis} at GMC Mumbai:
+Patient: ${patient.name}, ${patient.age}y/${patient.gender}
+Protocol rehab guidelines: ${(proto.rehab||[]).join("; ")}
+Additional notes: ${extra}
+Generate a week-by-week rehabilitation protocol including: Physiotherapy exercises, Activity restrictions, Return to work timeline, Scar management, Follow-up schedule, Red flag signs to watch. Format clearly with phases and timelines.`)},
+    {id:"consent",icon:"⚖️",label:"Consent Form",color:C.warn,
+     prompt:()=>AI_CALL(`Generate a detailed informed consent form for ${patient.diagnosis} at GMC Mumbai Plastic Surgery:
+Patient: ${patient.name}, ${patient.age}y, IPD: ${patient.id}
+Special consent points from protocol: ${(proto.special_consent||[]).join("; ")}
+Additional: ${extra}
+Generate a formal consent form with: Procedure description in simple language, Benefits, Risks (common and serious), Alternatives, Patient understanding confirmation, Signature lines. Should be legally appropriate for Indian medical practice.`)},
+    {id:"referral",icon:"📨",label:"Referral Letter",color:C.purple,
+     prompt:()=>AI_CALL(`Generate a professional inter-department referral letter from GMC Mumbai Plastic Surgery:
+Patient: ${patient.name}, ${patient.age}y/${patient.gender}, IPD: ${patient.id}
+Diagnosis: ${patient.diagnosis}
+Referring for: ${extra||"specialist opinion and management"}
+Ward: ${patient.ward}, Resident: Dr. ${patient.resident}
+Write a formal referral letter with: Patient details, Clinical summary, Reason for referral, Specific requests, Contact details. Standard GMC hospital format.`)}
+  ];
+
+  const copyToClipboard=()=>{navigator.clipboard?.writeText(result).then(()=>alert("Copied to clipboard!"));};
+  const printResult=()=>{const w=window.open('','_blank');w.document.write(`<html><head><title>${FEATURES.find(f=>f.id===mode)?.label} - ${patient.name}</title><style>body{font-family:Arial,sans-serif;font-size:11pt;margin:20mm;line-height:1.6}pre{white-space:pre-wrap;font-family:Arial}h1{font-size:13pt;color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:5px;margin-bottom:12px}</style></head><body><h1>GRANT MEDICAL COLLEGE & HOSPITAL, MUMBAI<br/><span style="font-size:11pt">Dept. of Plastic & Reconstructive Surgery</span></h1><pre>${result}</pre><div style="margin-top:30px;font-size:9pt;color:#666">Generated: ${new Date().toLocaleString('en-IN')} · GMC Plastics PMS</div></body></html>`);w.document.close();w.print();};
+
+  return(
+    <div style={S.ovl}>
+      <div style={{...S.box(900)}} className="fu">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>🤖 AI Assistant</div>
+            <div style={{fontSize:12,color:C.sub,marginTop:2}}>{patient.name} · {patient.diagnosis}</div>
+          </div>
+          <button onClick={onClose} style={S.btnSm()}>✕ Close</button>
+        </div>
+
+        {/* Feature grid */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+          {FEATURES.map(f=>(
+            <button key={f.id} onClick={()=>{setMode(f.id);setResult("");}} style={{...S.card({cursor:"pointer",border:`2px solid ${mode===f.id?f.color:C.b}`,background:mode===f.id?`${f.color}12`:C.card,padding:14,textAlign:"center",borderRadius:12,outline:"none"}),...{cursor:"pointer"}}}>
+              <div style={{fontSize:24,marginBottom:6}}>{f.icon}</div>
+              <div style={{fontSize:13,fontWeight:700,color:mode===f.id?f.color:C.t}}>{f.label}</div>
+            </button>
+          ))}
+        </div>
+
+        {mode&&(
+          <div className="fu">
+            <div style={{marginBottom:12}}>
+              <L t="Additional details / specific instructions for AI"/>
+              <textarea style={{...S.ta,minHeight:72}} value={extra} onChange={e=>setExtra(e.target.value)} placeholder="e.g. patient has DM, procedure was done under GA, any specific findings to include..."/>
+            </div>
+            <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+              <button onClick={()=>run(FEATURES.find(f=>f.id===mode).prompt)} style={S.btn("p")} disabled={busy}>
+                {busy?<><span className="spin"/> Generating...</>:<>🚀 Generate {FEATURES.find(f=>f.id===mode)?.label}</>}
+              </button>
+            </div>
+            {busy&&(
+              <div style={{...S.card({padding:20,textAlign:"center"})}}>
+                <div className="spin" style={{width:28,height:28,borderWidth:3}}></div>
+                <div style={{fontSize:13,color:C.sub,marginTop:10}}>AI is generating your document...</div>
+              </div>
+            )}
+            {result&&(
+              <div className="fu">
+                <div style={{...S.card({background:C.bg,padding:16,maxHeight:400,overflowY:"auto"})}}>
+                  <pre style={{fontSize:13,color:C.t,whiteSpace:"pre-wrap",lineHeight:1.6,fontFamily:"inherit"}}>{result}</pre>
+                </div>
+                <Sp h={10}/>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <button onClick={printResult} style={S.btn("g")}>🖨️ Print</button>
+                  <button onClick={copyToClipboard} style={S.btn("teal")}>📋 Copy</button>
+                  <button onClick={()=>run(FEATURES.find(f=>f.id===mode).prompt)} style={S.btn("ghost")}>🔄 Regenerate</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!mode&&(
+          <div style={{textAlign:"center",padding:"20px 0",color:C.sub,fontSize:13}}>
+            Select a document type above to generate with AI
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════
+// PHOTO STORAGE PANEL
+// ═══════════════════════════════════
+function PhotoPanel({patient,onClose}){
+  const [photos,setPhotos]=useState(()=>DB.getPhotos(patient.id));
+  const [activeTab,setActiveTab]=useState("preop");
+  const [uploading,setUploading]=useState(false);
+  const fileRef=useRef(); const camRef=useRef();
+
+  useEffect(()=>DB.setPhotos(patient.id,photos),[photos,patient.id]);
+
+  const upload=async(file,category)=>{
+    if(!file)return;
+    setUploading(true);
+    try{
+      const url=await DB.uploadFile(`${patient.id}/${category}`,file);
+      const ph={url,name:file.name,ts:Date.now(),caption:""};
+      setPhotos(p=>({...p,[category]:[...(p[category]||[]),ph]}));
+    }catch(e){console.error(e);}
+    setUploading(false);
+  };
+
+  const delPhoto=(category,idx)=>setPhotos(p=>({...p,[category]:(p[category]||[]).filter((_,i)=>i!==idx)}));
+  const updateCaption=(category,idx,caption)=>setPhotos(p=>({...p,[category]:(p[category]||[]).map((ph,i)=>i===idx?{...ph,caption}:ph)}));
+
+  const exportPhotos=()=>{
+    const w=window.open('','_blank');
+    const cats=[{k:"preop",l:"Pre-Op Photos"},{k:"intraop",l:"Intra-Op Photos"},{k:"postop",l:"Post-Op Photos"}];
+    w.document.write(`<html><head><title>Photos - ${patient.name}</title>
+<style>body{font-family:Arial,sans-serif;margin:15mm}h1{font-size:13pt;color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:5px}h2{font-size:11pt;color:#1B3A6B;margin:14px 0 8px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.ph{break-inside:avoid}.ph img{width:100%;border-radius:6px;border:1px solid #ddd}.caption{font-size:9pt;color:#666;margin-top:4px;text-align:center}
+.info{background:#f5f7ff;padding:8px;border-radius:6px;margin-bottom:14px;font-size:10pt}.ft{font-size:8pt;color:#888;margin-top:20px;text-align:right}
+</style></head><body>
+<h1>GRANT MEDICAL COLLEGE & HOSPITAL<br/><span style="font-size:10pt">Dept. of Plastic & Reconstructive Surgery — Photo Documentation</span></h1>
+<div class="info"><b>Patient:</b> ${patient.name} &nbsp;|&nbsp; <b>IPD:</b> ${patient.id} &nbsp;|&nbsp; <b>Age/Gender:</b> ${patient.age}y/${patient.gender}<br/><b>Diagnosis:</b> ${patient.diagnosis} &nbsp;|&nbsp; <b>Admitted:</b> ${patient.admitDate}</div>
+${cats.map(({k,l})=>{
+  const phs=photos[k]||[];
+  if(phs.length===0)return`<h2>${l} — No photos</h2>`;
+  return`<h2>${l} (${phs.length} photos)</h2><div class="grid">${phs.map(ph=>`<div class="ph"><img src="${ph.url}" onerror="this.style.display='none'"/><div class="caption">${ph.caption||ph.name}</div></div>`).join("")}</div>`;
+}).join("")}
+<div class="ft">Exported: ${new Date().toLocaleString('en-IN')} · GMC Plastics PMS v6</div></body></html>`);
+    w.document.close();w.print();
+  };
+
+  const TABS=[{id:"preop",l:"Pre-Op",icon:"📷"},{id:"intraop",l:"Intra-Op",icon:"🔪"},{id:"postop",l:"Post-Op",icon:"💊"}];
+
+  return(
+    <div style={S.ovl}>
+      <div style={{...S.box(960)}} className="fu">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>📸 Photo Storage</div>
+            <div style={{fontSize:12,color:C.sub,marginTop:2}}>{patient.name} · {patient.id}</div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={exportPhotos} style={S.btnSm("g")}>📤 Export All</button>
+            <button onClick={onClose} style={S.btnSm()}>✕</button>
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:4,marginBottom:14,borderBottom:`1px solid ${C.b}`,paddingBottom:8}}>
+          {TABS.map(t=>(
+            <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{padding:"8px 16px",borderRadius:8,border:"none",cursor:"pointer",background:activeTab===t.id?"#1D4ED8":"transparent",color:activeTab===t.id?"#fff":C.sub,fontSize:13,fontWeight:600,fontFamily:"inherit"}}>
+              {t.icon} {t.l} ({(photos[t.id]||[]).length})
+            </button>
+          ))}
+        </div>
+
+        {/* Upload buttons */}
+        <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+          <button onClick={()=>fileRef.current?.click()} style={S.btn("p")} disabled={uploading}>
+            {uploading?<><span className="spin"/>Uploading...</>:<>📁 Upload File</>}
+          </button>
+          <button onClick={()=>camRef.current?.click()} style={S.btn("teal")} disabled={uploading}>📷 Take Photo</button>
+          <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple style={{display:"none"}} onChange={e=>{Array.from(e.target.files).forEach(f=>upload(f,activeTab));e.target.value="";}}/>
+          <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{upload(e.target.files[0],activeTab);e.target.value="";}}/>
+        </div>
+
+        {/* Photo grid */}
+        {(photos[activeTab]||[]).length===0?(
+          <div style={{textAlign:"center",padding:48,color:C.sub,border:`2px dashed ${C.b}`,borderRadius:12}}>
+            <div style={{fontSize:40,marginBottom:10}}>📷</div>
+            <div>No {activeTab} photos yet</div>
+            <div style={{fontSize:12,marginTop:4}}>Upload files or take a photo using buttons above</div>
+          </div>
+        ):(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:12}}>
+            {(photos[activeTab]||[]).map((ph,i)=>(
+              <div key={i} style={{...S.card({padding:10})}}>
+                {(ph.url.startsWith('data:image')||ph.url.startsWith('http'))?(
+                  <img src={ph.url} alt={ph.name} style={{width:"100%",height:130,objectFit:"cover",borderRadius:8,cursor:"pointer",marginBottom:8}} onClick={()=>window.open(ph.url,'_blank')}/>
+                ):(
+                  <div style={{width:"100%",height:130,background:C.bg,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8,border:`1px solid ${C.b}`,cursor:"pointer"}} onClick={()=>window.open(ph.url,'_blank')}>
+                    <span style={{fontSize:32}}>📄</span>
+                  </div>
+                )}
+                <input style={{...S.inp,fontSize:11,padding:"5px 8px"}} value={ph.caption||""} onChange={e=>updateCaption(activeTab,i,e.target.value)} placeholder="Add caption..."/>
+                <div style={{display:"flex",gap:6,marginTop:6}}>
+                  <button onClick={()=>window.open(ph.url,'_blank')} style={{...S.btnSm("p"),flex:1,justifyContent:"center"}}>View</button>
+                  <button onClick={()=>delPhoto(activeTab,i)} style={{...S.btnSm("r"),justifyContent:"center"}}>🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <Sp h={10}/>
+        <div style={{fontSize:12,color:C.mu,textAlign:"center"}}>Photos saved to Supabase cloud storage · Click Export to download as printable PDF</div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════
+// LOGBOOK
+// ═══════════════════════════════════
+function Logbook({pts,protos,user,onClose}){
+  const [log,setLog]=useState(()=>DB.getLogbook());
+  const [filter,setFilter]=useState("");
+  const [showAdd,setShowAdd]=useState(false);
+  const [newEntry,setNewEntry]=useState({patientId:"",procedure:"",date:new Date().toISOString().split("T")[0],role:"Resident",notes:"",outcome:"",supervisor:""});
+
+  const addEntry=()=>{
+    if(!newEntry.procedure||!newEntry.date)return alert("Procedure and date required");
+    const pt=pts.find(p=>p.id===newEntry.patientId);
+    const entry={...newEntry,patientName:pt?.name||newEntry.patientId,surgeon:user.name,addedAt:new Date().toISOString()};
+    DB.addLogEntry(entry);
+    setLog(DB.getLogbook());
+    setShowAdd(false);
+    setNewEntry({patientId:"",procedure:"",date:new Date().toISOString().split("T")[0],role:"Resident",notes:"",outcome:"",supervisor:""});
+  };
+
+  const filtered=log.filter(e=>!filter||e.procedure.toLowerCase().includes(filter.toLowerCase())||e.patientName.toLowerCase().includes(filter.toLowerCase())||e.date.includes(filter));
+
+  const exportLogbook=()=>{
+    const w=window.open('','_blank');
+    w.document.write(`<html><head><title>Logbook - Dr. ${user.name}</title>
+<style>body{font-family:Arial,sans-serif;font-size:10pt;margin:15mm}h1{font-size:13pt;color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:5px}
+table{width:100%;border-collapse:collapse;margin-top:14px}th{background:#1B3A6B;color:#fff;padding:6px 10px;font-size:10pt;text-align:left}
+td{padding:5px 10px;border-bottom:1px solid #eee;font-size:9.5pt}tr:nth-child(even){background:#f5f7ff}.ft{font-size:8pt;color:#888;margin-top:14px;text-align:right}
+</style></head><body>
+<h1>GRANT MEDICAL COLLEGE & HOSPITAL, MUMBAI<br/><span style="font-size:10pt">Dept. of Plastic & Reconstructive Surgery — Case Logbook</span></h1>
+<div style="font-size:10pt;margin-bottom:10px"><b>Surgeon:</b> Dr. ${user.name} &nbsp;|&nbsp; <b>Total Cases:</b> ${log.length} &nbsp;|&nbsp; <b>Exported:</b> ${new Date().toLocaleDateString('en-IN')}</div>
+<table><tr><th>#</th><th>Date</th><th>Patient</th><th>Procedure</th><th>Role</th><th>Supervisor</th><th>Outcome</th><th>Notes</th></tr>
+${log.map((e,i)=>`<tr><td>${i+1}</td><td>${e.date}</td><td>${e.patientName}</td><td>${e.procedure}</td><td>${e.role}</td><td>${e.supervisor||"—"}</td><td>${e.outcome||"—"}</td><td>${e.notes||"—"}</td></tr>`).join("")}
+</table>
+<div class="ft">Total: ${log.length} cases · GMC Plastics PMS v6</div></body></html>`);
+    w.document.close();w.print();
+  };
+
+  return(
+    <div style={S.ovl}>
+      <div style={{...S.box(1000)}} className="fu">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>📚 Case Logbook</div>
+            <div style={{fontSize:12,color:C.sub,marginTop:2}}>Dr. {user.name} · {log.length} cases logged</div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={exportLogbook} style={S.btnSm("g")}>📤 Export</button>
+            <button onClick={()=>setShowAdd(!showAdd)} style={S.btnSm("p")}>+ Add Case</button>
+            <button onClick={onClose} style={S.btnSm()}>✕</button>
+          </div>
+        </div>
+
+        {showAdd&&(
+          <div style={{...S.card({background:C.bg,marginBottom:14})}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:12}}>Log New Case</div>
+            <div style={S.g2}>
+              <div><L t="Date"/><input type="date" style={S.inp} value={newEntry.date} onChange={e=>setNewEntry(p=>({...p,date:e.target.value}))}/></div>
+              <div><L t="Patient (select from ward)"/>
+                <select style={S.sel} value={newEntry.patientId} onChange={e=>setNewEntry(p=>({...p,patientId:e.target.value,procedure:pts.find(x=>x.id===e.target.value)?.diagnosis||p.procedure}))}>
+                  <option value="">-- Select Patient --</option>
+                  {pts.map(p=><option key={p.id} value={p.id}>{p.name} ({p.id})</option>)}
+                </select>
+              </div>
+              <div><L t="Procedure"/><input style={S.inp} value={newEntry.procedure} onChange={e=>setNewEntry(p=>({...p,procedure:e.target.value}))} placeholder="e.g. STSG, Flap cover..."/></div>
+              <div><L t="Your Role"/>
+                <select style={S.sel} value={newEntry.role} onChange={e=>setNewEntry(p=>({...p,role:e.target.value}))}>
+                  <option>Resident (Primary Surgeon)</option><option>Resident (First Assistant)</option><option>Senior Resident</option><option>Observer</option>
+                </select>
+              </div>
+              <div><L t="Supervisor / Consultant"/><input style={S.inp} value={newEntry.supervisor} onChange={e=>setNewEntry(p=>({...p,supervisor:e.target.value}))} placeholder="Prof. / Dr."/></div>
+              <div><L t="Outcome"/>
+                <select style={S.sel} value={newEntry.outcome} onChange={e=>setNewEntry(p=>({...p,outcome:e.target.value}))}>
+                  <option value="">-- Select --</option><option>Successful</option><option>Complicated</option><option>Reoperation needed</option><option>Discharged well</option>
+                </select>
+              </div>
+              <div style={{gridColumn:"1/-1"}}><L t="Notes / Learning points"/>
+                <textarea style={S.ta} value={newEntry.notes} onChange={e=>setNewEntry(p=>({...p,notes:e.target.value}))} placeholder="Key learning points, intraop findings, post-op course..."/>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:12}}>
+              <button onClick={addEntry} style={S.btn("g")}>💾 Log Case</button>
+              <button onClick={()=>setShowAdd(false)} style={S.btn("ghost")}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        <input style={{...S.inp,marginBottom:14}} placeholder="🔍 Filter by procedure, patient or date..." value={filter} onChange={e=>setFilter(e.target.value)}/>
+
+        {filtered.length===0?(
+          <div style={{textAlign:"center",padding:40,color:C.sub}}>
+            <div style={{fontSize:36,marginBottom:10}}>📚</div>
+            <div>No cases logged yet. Click + Add Case to start.</div>
+          </div>
+        ):(
+          <div>
+            {filtered.map((e,i)=>(
+              <div key={e.id||i} style={{...S.card({borderLeft:`4px solid ${C.accent}`})}}>
+                <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,color:C.t,fontSize:14}}>{e.procedure}</div>
+                    <div style={{fontSize:12,color:C.sub,marginTop:2}}>{e.patientName} · {e.date} · <span style={{color:C.accent}}>{e.role}</span></div>
+                    {e.supervisor&&<div style={{fontSize:11,color:C.mu,marginTop:1}}>Supervisor: {e.supervisor}</div>}
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    {e.outcome&&<Tag label={e.outcome} color={e.outcome==="Successful"?C.ok:e.outcome.includes("Complic")?C.err:C.warn}/>}
+                  </div>
+                </div>
+                {e.notes&&<div style={{marginTop:8,fontSize:12,color:C.sub,borderTop:`1px solid ${C.b}`,paddingTop:6,lineHeight:1.5}}>{e.notes}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════
+// REHAB PROTOCOL PANEL
+// ═══════════════════════════════════
+function RehabPanel({patient,protos,onClose}){
+  const proto=protos[patient.diagnosis]||{};
+  const [custom,setCustom]=useState(()=>LS.g('rehab_'+patient.id,""));
+  const [generating,setGenerating]=useState(false);
+  const [aiRehab,setAiRehab]=useState("");
+
+  useEffect(()=>LS.s('rehab_'+patient.id,custom),[custom,patient.id]);
+
+  const genAI=async()=>{
+    setGenerating(true);
+    try{
+      const r=await AI_CALL(`Generate a detailed week-by-week rehabilitation protocol for ${patient.diagnosis} at GMC Mumbai:
+Patient: ${patient.name}, ${patient.age}y/${patient.gender}
+Protocol guidelines: ${(proto.rehab||[]).join("; ")}
+Include: Physiotherapy phases, Exercise progression, Activity restrictions, Scar management, Return to work/school timeline, Follow-up schedule, Warning signs.`);
+      setAiRehab(r);
+    }catch(e){setAiRehab("Error: "+e.message);}
+    setGenerating(false);
+  };
+
+  const print=()=>{
+    const w=window.open('','_blank');
+    const content=aiRehab||custom||(proto.rehab||[]).join('\n');
+    w.document.write(`<html><head><title>Rehab - ${patient.name}</title>
+<style>body{font-family:Arial,sans-serif;font-size:10.5pt;margin:15mm;line-height:1.6}h1{font-size:13pt;color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:5px}pre{white-space:pre-wrap;font-size:10.5pt}</style></head><body>
+<h1>GRANT MEDICAL COLLEGE & HOSPITAL<br/><span style="font-size:10pt">Rehabilitation Protocol — ${patient.diagnosis}</span></h1>
+<div style="margin-bottom:12px;font-size:10pt"><b>Patient:</b> ${patient.name} | <b>IPD:</b> ${patient.id} | <b>Age:</b> ${patient.age}y/${patient.gender}</div>
+<pre>${content}</pre>
+<div style="margin-top:20px;font-size:9pt;color:#888">GMC Plastics PMS v6 · ${new Date().toLocaleString('en-IN')}</div></body></html>`);
+    w.document.close();w.print();
+  };
+
+  return(
+    <div style={S.ovl}>
+      <div style={{...S.box(800)}} className="fu">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>🏃 Rehab Protocol</div>
+            <div style={{fontSize:12,color:C.sub,marginTop:2}}>{patient.name} · {patient.diagnosis}</div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={print} style={S.btnSm("g")}>🖨️ Print</button>
+            <button onClick={onClose} style={S.btnSm()}>✕</button>
+          </div>
+        </div>
+
+        {/* Protocol guidelines */}
+        {(proto.rehab||[]).length>0&&(
+          <div style={{...S.card({background:`${C.teal}08`,border:`1px solid ${C.teal}25`,marginBottom:14})}}>
+            <div style={{fontSize:12,fontWeight:700,color:C.teal,marginBottom:8}}>📋 Protocol Guidelines</div>
+            {(proto.rehab||[]).map((r,i)=>(
+              <div key={i} style={{fontSize:13,color:C.t,padding:"4px 0",borderBottom:`1px solid ${C.b}30`}}>{i+1}. {r}</div>
+            ))}
+          </div>
+        )}
+
+        <button onClick={genAI} style={{...S.btn("teal"),marginBottom:14,width:"100%"}} disabled={generating}>
+          {generating?<><span className="spin"/>Generating AI Rehab Protocol...</>:<>🤖 Generate Detailed AI Rehab Protocol</>}
+        </button>
+
+        {aiRehab&&(
+          <div style={{...S.card({background:C.bg,maxHeight:300,overflowY:"auto",marginBottom:14})}}>
+            <pre style={{fontSize:13,color:C.t,whiteSpace:"pre-wrap",lineHeight:1.6,fontFamily:"inherit"}}>{aiRehab}</pre>
+          </div>
+        )}
+
+        <L t="Custom Notes / Instructions"/>
+        <textarea style={{...S.ta,minHeight:120}} value={custom} onChange={e=>setCustom(e.target.value)} placeholder="Add custom rehabilitation notes for this patient..."/>
+        <Sp h={12}/>
+        <button onClick={print} style={S.btn("g",true)}>🖨️ Print Rehabilitation Protocol</button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════
+// INVESTIGATION ROW + PHOTO
+// ═══════════════════════════════════
+function InvRow({item,idx,patId,checked,onChk,photos,onAddPhoto}){
+  const [exp,setExp]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const fRef=useRef();const cRef=useRef();
+  const key='inv_'+idx;
+  const mine=(photos.inv||{})[key]||[];
+  const handle=async file=>{
+    if(!file)return;setBusy(true);
+    try{const url=await DB.uploadFile(`${patId}/inv_${idx}`,file);onAddPhoto(key,{url,name:file.name,ts:Date.now()});}
+    catch(e){const url=await new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(file);});onAddPhoto(key,{url,name:file.name,ts:Date.now()});}
+    setBusy(false);setExp(true);
+  };
+  return(
+    <div style={{marginBottom:6}}>
+      <div style={S.chkrow(checked)} onClick={()=>onChk(key)}>
+        <CB chk={checked} on={()=>onChk(key)}/>
+        <span style={{flex:1,fontSize:13,color:checked?"#5E7A9E":C.t,textDecoration:checked?"line-through":"none",lineHeight:1.4}}>{item}</span>
+        <div style={{display:"flex",gap:5,marginLeft:8}} onClick={e=>e.stopPropagation()}>
+          {mine.length>0&&<button onClick={()=>setExp(!exp)} style={S.btnSm("p")}>📎{mine.length}</button>}
+          <button onClick={()=>fRef.current?.click()} style={S.btnSm("p")} title="Upload">{busy?<span className="spin"/>:"📁"}</button>
+          <button onClick={()=>cRef.current?.click()} style={S.btnSm("teal")} title="Camera">📷</button>
+          <input ref={fRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={e=>{handle(e.target.files[0]);e.target.value="";}}/>
+          <input ref={cRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{handle(e.target.files[0]);e.target.value="";}}/>
+        </div>
+      </div>
+      {exp&&mine.length>0&&(
+        <div style={{marginLeft:30,marginBottom:6,display:"flex",flexWrap:"wrap",gap:8}}>
+          {mine.map((ph,pi)=>(
+            <div key={pi}>{(ph.url.startsWith('data:')||ph.url.startsWith('http'))
+              ?<img src={ph.url} alt={ph.name} style={{width:76,height:76,objectFit:"cover",borderRadius:8,border:`1px solid ${C.b}`,cursor:"pointer"}} onClick={()=>window.open(ph.url,'_blank')}/>
+              :<a href={ph.url} target="_blank" rel="noreferrer" style={{display:"flex",gap:5,alignItems:"center",padding:"5px 10px",background:C.card,borderRadius:8,border:`1px solid ${C.b}`,color:C.accent,fontSize:12,textDecoration:"none"}}>📄 {ph.name}</a>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════
+// PROTOCOL PANEL
+// ═══════════════════════════════════
+function ProtPanel({diagnosis,patId,protos}){
+  const proto=protos[diagnosis];
+  const [chks,setChks]=useState(()=>DB.getChks(patId));
+  const [photos,setPhotos]=useState(()=>DB.getPhotos(patId));
+  const [open,setOpen]=useState("investigations");
+  useEffect(()=>DB.setChks(patId,chks),[chks,patId]);
+  useEffect(()=>DB.setPhotos(patId,photos),[photos,patId]);
+  if(!proto)return<div style={S.card({textAlign:"center",padding:40,color:C.sub})}>No protocol. Add via Protocol Manager.</div>;
+  const tog=k=>setChks(p=>({...p,[k]:!p[k]}));
+  const addInvPhoto=(key,ph)=>setPhotos(p=>({...p,inv:{...(p.inv||{}),[key]:[...((p.inv||{})[key]||[]),ph]}}));
+  const allInvDone=(proto.investigations||[]).every((_,i)=>chks['inv_'+i]);
+  const Sec=({k,icon,title,items,isInv})=>(
+    <div style={{marginBottom:10}}>
+      <div style={S.sh} onClick={()=>setOpen(open===k?null:k)}>
+        <span style={{fontSize:16}}>{icon}</span>
+        <span style={{fontWeight:700,color:C.t,flex:1,fontSize:14}}>{title}</span>
+        <span style={{color:C.mu,fontSize:14}}>{open===k?"▲":"▼"}</span>
+      </div>
+      {open===k&&(items||[]).map((item,i)=>{
+        const key=isInv?'inv_'+i:`${k}_${i}`;
+        return isInv
+          ?<InvRow key={i} item={item} idx={i} patId={patId} checked={!!chks['inv_'+i]} onChk={tog} photos={photos} onAddPhoto={addInvPhoto}/>
+          :<div key={i} style={S.chkrow(!!chks[key])} onClick={()=>tog(key)}>
+            <CB chk={!!chks[key]} on={()=>tog(key)}/>
+            <span style={{fontSize:13,color:chks[key]?"#5E7A9E":C.t,textDecoration:chks[key]?"line-through":"none",lineHeight:1.4}}>{item}</span>
+          </div>;
+      })}
+    </div>
+  );
+  return(
+    <div>
+      <div style={S.card({background:`linear-gradient(135deg,${proto.color}12,${C.card})`,borderLeft:`4px solid ${proto.color}`,marginBottom:14})}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+          <div>
+            <div style={{fontSize:11,color:proto.color,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:4}}>🤖 Protocol Loaded</div>
+            <div style={{fontSize:15,fontWeight:800,color:C.t}}>{diagnosis}</div>
+          </div>
+          <Tag label={proto.category} color={proto.color}/>
+        </div>
+        {allInvDone&&<div style={{marginTop:10,padding:"7px 12px",background:"rgba(34,197,94,0.1)",borderRadius:8,color:"#22C55E",fontSize:13,fontWeight:600}}>✅ All investigations checked — patient ready for OT</div>}
+      </div>
+      <Sec k="investigations" icon="🧪" title="Investigations" items={proto.investigations} isInv={true}/>
+      <Sec k="preop" icon="✅" title="Pre-Op Checklist" items={proto.preop_checklist}/>
+      <Sec k="preop_orders" icon="📝" title="Pre-Op Orders" items={proto.preop_orders}/>
+      <Sec k="special_consent" icon="⚖️" title="Special Consent" items={proto.special_consent}/>
+      <Sec k="materials" icon="🛒" title="Materials & Equipment" items={proto.materials}/>
+      <Sec k="intraop" icon="🔪" title="Intra-Op" items={proto.intraop}/>
+      <Sec k="postop" icon="💊" title="Post-Op Orders" items={proto.postop}/>
+      <Sec k="rehab" icon="🏃" title="Rehabilitation" items={proto.rehab}/>
+      {proto.references&&proto.references.length>0&&(
+        <div style={{marginBottom:10}}>
+          <div style={S.sh} onClick={()=>setOpen(open==="references"?null:"references")}>
+            <span style={{fontSize:16}}>📚</span>
+            <span style={{fontWeight:700,color:C.t,flex:1,fontSize:14}}>References</span>
+            <span style={{color:C.mu,fontSize:14}}>{open==="references"?"▲":"▼"}</span>
+          </div>
+          {open==="references"&&(
+            <div style={{padding:"8px 0"}}>
+              {proto.references.map((ref,i)=>{
+                const isUrl=ref.startsWith("http");
+                const pubmedMatch=ref.match(/pubmed|ncbi|doi/i);
+                const aoMatch=ref.match(/aosurgery|ao cmf|ao spine/i);
+                const url=isUrl?ref:pubmedMatch?`https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(ref)}`:aoMatch?"https://aosurgery.org":`https://scholar.google.com/scholar?q=${encodeURIComponent(ref)}`;
+                return(
+                  <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"9px 12px",borderRadius:10,marginBottom:5,background:`${C.accent}06`,border:`1px solid ${C.accent}20`}}>
+                    <span style={{color:C.accent,fontSize:13,fontWeight:800,flexShrink:0}}>[{i+1}]</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13,color:C.t,lineHeight:1.5}}>{ref}</div>
+                      <a href={url} target="_blank" rel="noreferrer" style={{fontSize:11,color:C.accent,textDecoration:"none",marginTop:3,display:"inline-flex",alignItems:"center",gap:4}}>
+                        🔗 {pubmedMatch?"Search PubMed":aoMatch?"Open AO Surgery":"Search Google Scholar"} ↗
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════
+// DISCHARGE SUMMARY
+// ═══════════════════════════════════
+function DSSummary({patient,proto}){
+  const [ds,setDs]=useState(()=>DB.getDS(patient.id));
+  const upd=(k,v)=>setDs(p=>({...p,[k]:v}));
+  useEffect(()=>DB.setDS(patient.id,ds),[ds,patient.id]);
+  const [generating,setGenerating]=useState(false);
+
+  const genAI=async(k,promptText)=>{
+    setGenerating(k);
+    try{const r=await AI_CALL(promptText);upd(k,r);}catch(e){console.error(e);}
+    setGenerating(false);
+  };
+
+  const F=({label,k,rows=3,hint="",aiPrompt})=>(
+    <div style={{marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+        <L t={label}/>
+        {aiPrompt&&<button onClick={()=>genAI(k,aiPrompt)} style={S.btnSm("pur")} disabled={generating===k}>
+          {generating===k?<span className="spin"/>:"🤖 AI Fill"}
+        </button>}
+      </div>
+      <textarea style={{...S.ta,minHeight:rows*30}} value={ds[k]||""} onChange={e=>upd(k,e.target.value)} placeholder={hint||`Enter ${label.toLowerCase()}...`}/>
+    </div>
+  );
+  const print=()=>{
+    const w=window.open('','_blank');
+    w.document.write(`<!DOCTYPE html><html><head><title>Discharge - ${patient.name}</title>
+<style>body{font-family:Arial,sans-serif;font-size:10.5pt;color:#111;margin:15mm 18mm;line-height:1.5}h1{font-size:13pt;text-align:center;color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:5px}h2{font-size:10.5pt;color:#1B3A6B;margin:10px 0 3px;border-bottom:1px solid #bcd;padding-bottom:2px}.g{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px}.f{background:#f5f7ff;padding:4px 8px;border-radius:3px;border:1px solid #dde}.fl{font-size:8pt;color:#777;font-weight:bold;text-transform:uppercase}.fv{font-size:10pt;margin-top:1px}.sec{padding:5px 10px;border-left:3px solid #1B3A6B;background:#f9faff;white-space:pre-wrap;margin-bottom:6px}.sig{display:flex;justify-content:space-between;margin-top:28px}.sig div{text-align:center;border-top:1px solid #555;padding-top:3px;width:155px;font-size:9pt}.ft{text-align:right;font-size:8pt;color:#888;margin-top:14px}</style></head><body>
+<h1>GRANT MEDICAL COLLEGE & HOSPITAL, MUMBAI<br/><span style="font-size:10.5pt">Dept. of Plastic & Reconstructive Surgery</span><br/><span style="font-size:9pt;color:#555">DISCHARGE SUMMARY</span></h1>
+<div class="g">${[["Patient",patient.name],["IPD No.",patient.id],["Age/Gender",`${patient.age}y/${patient.gender}`],["Ward",patient.ward],["Admitted",patient.admitDate],["Discharged",new Date().toLocaleDateString('en-IN')],["Diagnosis",patient.diagnosis],["Resident",`Dr. ${patient.resident}`]].map(([k,v])=>`<div class="f"><div class="fl">${k}</div><div class="fv">${v||"—"}</div></div>`).join("")}</div>
+${ds.chiefComplaint?`<h2>Chief Complaint</h2><div class="sec">${ds.chiefComplaint}</div>`:""}
+${ds.history?`<h2>History of Present Illness</h2><div class="sec">${ds.history}</div>`:""}
+${ds.pastHistory?`<h2>Past History / Co-morbidities</h2><div class="sec">${ds.pastHistory}</div>`:""}
+${ds.examination?`<h2>Examination Findings</h2><div class="sec">${ds.examination}</div>`:""}
+${ds.investigations?`<h2>Investigations</h2><div class="sec">${ds.investigations}</div>`:""}
+${ds.treatment?`<h2>Treatment Given</h2><div class="sec">${ds.treatment}</div>`:""}
+${ds.procedure?`<h2>Procedure / Operation Details</h2><div class="sec">${ds.procedure}</div>`:""}
+${ds.course?`<h2>Course in Hospital</h2><div class="sec">${ds.course}</div>`:""}
+<h2>Advice on Discharge</h2><div class="sec">${(proto?.postop||[]).slice(0,6).join("\n")}${ds.advice?"\n\nAdditional:\n"+ds.advice:""}</div>
+${ds.medications?`<div class="sec"><strong>Medications:</strong>\n${ds.medications}</div>`:""}
+${ds.diet?`<div class="sec"><strong>Diet:</strong> ${ds.diet}</div>`:""}
+${ds.activity?`<div class="sec"><strong>Activity:</strong> ${ds.activity}</div>`:""}
+<h2>Follow-Up</h2><div class="sec">${ds.followupDate?"Review: "+ds.followupDate+"\n":""}${ds.followup||"Review at Plastics OPD. Return if fever, wound opening, or any concern."}</div>
+${ds.emergency?`<div class="sec"><strong>Emergency Contact:</strong> ${ds.emergency}</div>`:""}
+<div class="sig"><div>Patient/Attender<br/>Signature</div><div>Dr. ${patient.resident}<br/>Resident Surgeon</div><div>Consultant<br/>Signature & Seal</div></div>
+<div class="ft">GMC Plastics PMS v6 · ${new Date().toLocaleString('en-IN')}</div></body></html>`);
+    w.document.close();w.focus();w.print();
+  };
+  return(
+    <div>
+      <div style={S.card({borderTop:`3px solid ${C.accent}`,marginBottom:14})}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+          <div style={{fontSize:14,fontWeight:800,color:C.t}}>📄 Discharge Summary</div>
+          <button onClick={print} style={S.btn("g")}>🖨️ Print / PDF</button>
+        </div>
+        <div style={S.g2}>
+          {[["Patient",patient.name],["IPD",patient.id],["Age/Gender",`${patient.age}y/${patient.gender}`],["Ward",patient.ward],["Admitted",patient.admitDate],["Diagnosis",patient.diagnosis]].map(([k,v])=>(
+            <div key={k} style={{padding:"6px 10px",background:C.bg,borderRadius:8,border:`1px solid ${C.b}`}}>
+              <div style={{fontSize:10,color:C.sub,textTransform:"uppercase"}}>{k}</div>
+              <div style={{fontSize:12,color:C.t,fontWeight:600,marginTop:1}}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={S.card()}>
+        <F label="Chief Complaint" k="chiefComplaint" rows={2} hint="e.g. RTA with facial fractures, 3 days ago"
+           aiPrompt={`Write a brief chief complaint for a patient with ${patient.diagnosis}, ${patient.age}y/${patient.gender}, admitted to GMC Plastic Surgery.`}/>
+        <F label="History of Present Illness" k="history" rows={4} hint="Onset, duration, mechanism, progression..."
+           aiPrompt={`Write a detailed history of present illness for a ${patient.age}y/${patient.gender} patient with ${patient.diagnosis} at GMC Mumbai Plastic Surgery. Notes: ${patient.notes||"none"}`}/>
+        <F label="Past History / Co-morbidities" k="pastHistory" rows={3}/>
+      </div>
+      <div style={S.card()}>
+        <F label="Examination Findings" k="examination" rows={5} hint="General + Local examination..."
+           aiPrompt={`Write examination findings for a ${patient.age}y/${patient.gender} patient with ${patient.diagnosis} on admission to GMC Mumbai Plastic Surgery. Include general exam and relevant local examination findings.`}/>
+      </div>
+      <div style={S.card()}>
+        <F label="Investigations" k="investigations" rows={5} hint="Hb ___ WBC ___ Plt ___&#10;RFT: ___&#10;Imaging: ..."/>
+      </div>
+      <div style={S.card()}>
+        <F label="Treatment Given" k="treatment" rows={4}
+           aiPrompt={`Write treatment given section for ${patient.diagnosis} patient at GMC Mumbai Plastic Surgery. Include standard treatment protocol: ${(proto?.preop_orders||[]).slice(0,4).join(", ")}`}/>
+        <F label="Procedure / Operation Details" k="procedure" rows={4} hint="Date: ___&#10;Procedure: ___&#10;Anaesthesia: GA/LA&#10;Findings: ..."
+           aiPrompt={`Write operative details for ${patient.diagnosis} procedure at GMC Mumbai Plastic Surgery for a ${patient.age}y/${patient.gender} patient. Include standard steps, findings, and closure.`}/>
+        <div style={{padding:"8px 12px",background:C.bg,borderRadius:8,border:`1px solid ${C.b}`,marginBottom:14}}>
+          <div style={{fontSize:11,color:C.sub,marginBottom:5}}>Protocol post-op orders (auto-included):</div>
+          {(proto?.postop||[]).slice(0,5).map((item,i)=><div key={i} style={{fontSize:12,color:C.t,padding:"2px 0",borderBottom:`1px solid ${C.b}`}}>{i+1}. {item}</div>)}
+        </div>
+        <F label="Course in Hospital" k="course" rows={4} hint="D1: stable...&#10;D5: wound healthy..."
+           aiPrompt={`Write a typical course in hospital for a ${patient.diagnosis} patient at GMC Mumbai. Include standard post-operative progress over 5-7 days.`}/>
+      </div>
+      <div style={S.card()}>
+        <F label="Medications on Discharge" k="medications" rows={4} hint="1. Tab. Amoxicillin-Clav 625mg BD x5d&#10;2. Tab. Diclofenac 50mg SOS..."
+           aiPrompt={`Write a discharge medication list for ${patient.diagnosis} at GMC Mumbai. Base on: ${(proto?.postop||[]).slice(0,5).join("; ")}`}/>
+        <F label="Additional Advice / Wound Care" k="advice" rows={3}/>
+        <F label="Diet Advice" k="diet" rows={2}/>
+        <F label="Activity Restrictions" k="activity" rows={2}/>
+        <div style={S.g2}>
+          <div><L t="Follow-Up Date"/><input type="date" style={S.inp} value={ds.followupDate||""} onChange={e=>upd("followupDate",e.target.value)}/></div>
+          <div><L t="Emergency Contact"/><input style={S.inp} value={ds.emergency||""} onChange={e=>upd("emergency",e.target.value)} placeholder="Ward phone"/></div>
+        </div>
+function WardRoundPanel({patient,onClose}){
+  const today=new Date().toISOString().split("T")[0];
+  const [rounds,setRounds]=useState(()=>LS.g(`wr_${patient.id}`,[]));
+  const [selDate,setSelDate]=useState(today);
+  const [newTask,setNewTask]=useState("");
+  const [taskPhotoUploading,setTaskPhotoUploading]=useState(null);
+  const taskCamRefs=useRef({});
+  const taskFileRefs=useRef({});
+  const roundCamRef=useRef();
+  const roundFileRef=useRef();
+
+  useEffect(()=>LS.s(`wr_${patient.id}`,rounds),[rounds,patient.id]);
+
+  const getRound=date=>rounds.find(r=>r.date===date)||{date,tasks:[],roundPhotos:[],notes:""};
+  const saveRound=(date,data)=>setRounds(prev=>{
+    const idx=prev.findIndex(r=>r.date===date);
+    if(idx>=0){const n=[...prev];n[idx]=data;return n;}
+    return [...prev,data];
+  });
+
+  const round=getRound(selDate);
+  const tasks=round.tasks||[];
+  const doneCount=tasks.filter(t=>t.done).length;
+  const pct=tasks.length?Math.round((doneCount/tasks.length)*100):0;
+
+  const addTask=()=>{
+    if(!newTask.trim())return;
+    const r=getRound(selDate);
+    saveRound(selDate,{...r,tasks:[...(r.tasks||[]),{id:Date.now(),label:newTask.trim(),done:false,doneAt:null,photos:[]}]});
+    setNewTask("");
+  };
+
+  const toggleTask=(id)=>{
+    const r=getRound(selDate);
+    saveRound(selDate,{...r,tasks:r.tasks.map(t=>t.id===id?{...t,done:!t.done,doneAt:!t.done?new Date().toLocaleString("en-IN"):null}:t)});
+  };
+
+  const delTask=(id)=>{
+    const r=getRound(selDate);
+    saveRound(selDate,{...r,tasks:r.tasks.filter(t=>t.id!==id)});
+  };
+
+  const uploadTaskPhoto=async(id,file)=>{
+    if(!file)return;
+    setTaskPhotoUploading(id);
+    let url;
+    try{url=await DB.uploadFile(`${patient.id}/wr/${selDate}`,file);}
+    catch(e){url=await new Promise(res=>{const rd=new FileReader();rd.onload=ev=>res(ev.target.result);rd.readAsDataURL(file);});}
+    const r=getRound(selDate);
+    saveRound(selDate,{...r,tasks:r.tasks.map(t=>t.id===id?{...t,photos:[...(t.photos||[]),{url,name:file.name,ts:Date.now()}]}:t)});
+    setTaskPhotoUploading(null);
+  };
+
+  const uploadRoundPhoto=async(file)=>{
+    if(!file)return;
+    let url;
+    try{url=await DB.uploadFile(`${patient.id}/wr/general/${selDate}`,file);}
+    catch(e){url=await new Promise(res=>{const rd=new FileReader();rd.onload=ev=>res(ev.target.result);rd.readAsDataURL(file);});}
+    const r=getRound(selDate);
+    saveRound(selDate,{...r,roundPhotos:[...(r.roundPhotos||[]),{url,name:file.name,ts:Date.now()}]});
+  };
+
+  const printRound=()=>{
+    const r=getRound(selDate);
+    const w=window.open("","_blank");
+    w.document.write(`<!DOCTYPE html><html><head><title>Ward Round ${selDate} - ${patient.name}</title>
+    <style>body{font-family:Arial,sans-serif;font-size:10.5pt;margin:15mm}
+    h1{font-size:13pt;color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:5px}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th{background:#1B3A6B;color:#fff;padding:6px 10px;font-size:10pt;text-align:left}
+    td{padding:6px 10px;border-bottom:1px solid #eee;font-size:9.5pt}
+    .done{color:#166534;font-weight:600}.pending{color:#991b1b}
+    .info{background:#f5f7ff;padding:8px 12px;border-radius:6px;margin-bottom:12px}
+    </style></head><body>
+    <h1>GRANT MEDICAL COLLEGE HOSPITAL, MUMBAI<br><span style="font-size:10pt;font-weight:normal">Dept. of Plastic & Reconstructive Surgery — Daily Ward Round</span></h1>
+    <div class="info"><b>Patient:</b> ${patient.name} &nbsp;·&nbsp; <b>IPD:</b> ${patient.id} &nbsp;·&nbsp; <b>Ward:</b> ${patient.ward} &nbsp;·&nbsp; <b>Date:</b> ${selDate}<br>
+    <b>Diagnosis:</b> ${patient.diagnosis} &nbsp;·&nbsp; <b>Resident:</b> Dr. ${patient.resident||"—"}</div>
+    <table><tr><th>#</th><th>Task</th><th>Status</th><th>Time Completed</th></tr>
+    ${(r.tasks||[]).map((t,i)=>`<tr><td>${i+1}</td><td>${t.label}</td><td class="${t.done?"done":"pending"}">${t.done?"✓ Done":"Pending"}</td><td>${t.doneAt||"—"}</td></tr>`).join("")}
+    </table>
+    ${r.notes?`<div style="margin-top:14px;padding:10px;background:#f5f7ff;border-radius:6px"><b>Notes:</b><br>${r.notes}</div>`:""}
+    <div style="margin-top:20px;font-size:8.5pt;color:#888">Printed: ${new Date().toLocaleString("en-IN")} · GMC Plastics PMS</div>
+    </body></html>`);
+    w.document.close();w.print();
+  };
+
+  const pastDates=[...new Set(rounds.map(r=>r.date))].sort((a,b)=>b.localeCompare(a));
+
+  return(
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.88)",zIndex:400,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"16px 12px",overflowY:"auto"}}>
+      <div style={{background:C.panel,border:`1px solid ${C.b}`,borderRadius:16,padding:20,width:"100%",maxWidth:720}} className="fu">
+
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>🩺 Ward Round</div>
+            <div style={{fontSize:12,color:C.sub,marginTop:2}}>{patient.name} · {patient.id} · {patient.ward}</div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={printRound} style={S.btnSm("g")}>🖨️ Print</button>
+            <button onClick={onClose} style={S.btnSm()}>✕ Close</button>
+          </div>
+        </div>
+
+        {/* Date picker */}
+        <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
+          <input type="date" style={{...S.inp,width:"auto",flex:"0 0 160px"}} value={selDate} onChange={e=>setSelDate(e.target.value)}/>
+          {pastDates.slice(0,5).map(d=>(
+            <button key={d} onClick={()=>setSelDate(d)} style={{...S.btnSm(selDate===d?"p":null),fontSize:11,padding:"4px 10px"}}>{d===today?"Today":d}</button>
+          ))}
+        </div>
+
+        {/* Progress */}
+        {tasks.length>0&&(
+          <div style={{background:C.card,borderRadius:10,padding:"10px 14px",marginBottom:14,border:`1px solid ${C.b}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{fontSize:11,color:C.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.5px"}}>Progress</span>
+              <span style={{fontSize:13,fontWeight:800,color:pct===100?C.ok:C.warn}}>{doneCount}/{tasks.length} · {pct}%</span>
+            </div>
+            <div style={{height:8,background:C.b,borderRadius:4,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${pct}%`,background:pct===100?C.ok:C.accent,borderRadius:4,transition:"width 0.3s"}}></div>
+            </div>
+            {pct===100&&<div style={{fontSize:12,color:C.ok,marginTop:6,fontWeight:600}}>✅ All tasks done for {selDate}</div>}
+          </div>
+        )}
+
+        {/* Add task input */}
+        <div style={{display:"flex",gap:8,marginBottom:14,padding:"10px 12px",background:`${C.teal}10`,border:`1px solid ${C.teal}30`,borderRadius:10,alignItems:"center"}}>
+          <input style={{...S.inp,flex:1,background:"transparent",border:"none",padding:"4px 0",outline:"none",color:C.t}} value={newTask} onChange={e=>setNewTask(e.target.value)} placeholder="Add a task for today's round (e.g. Check drain, Wound photo, Flap Doppler)..." onKeyDown={e=>e.key==="Enter"&&addTask()}/>
+          <button onClick={addTask} style={S.btnSm("teal")}>+ Add</button>
+        </div>
+
+        {/* Tasks */}
+        {tasks.length===0&&(
+          <div style={{textAlign:"center",padding:"32px 20px",border:`2px dashed ${C.b}`,borderRadius:12,color:C.sub,marginBottom:14}}>
+            <div style={{fontSize:36,marginBottom:8}}>🩺</div>
+            <div style={{fontSize:13}}>No tasks yet for {selDate}</div>
+            <div style={{fontSize:12,marginTop:4}}>Add custom tasks above — e.g. dressing change, flap check, drain removal</div>
+          </div>
+        )}
+        <div style={{marginBottom:14}}>
+          {tasks.map(t=>(
+            <div key={t.id} style={{marginBottom:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:10,background:t.done?"rgba(34,197,94,0.07)":"rgba(59,130,246,0.03)",border:`1px solid ${t.done?"#22C55E40":C.b}`,transition:"all 0.15s"}}>
+                <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${t.done?"#22C55E":C.mu}`,background:t.done?"#22C55E":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}} onClick={()=>toggleTask(t.id)}>
+                  {t.done&&<span style={{color:"#fff",fontSize:12,fontWeight:900}}>✓</span>}
+                </div>
+                <span style={{flex:1,fontSize:13,color:t.done?C.sub:C.t,textDecoration:t.done?"line-through":"none",lineHeight:1.4,cursor:"pointer"}} onClick={()=>toggleTask(t.id)}>{t.label}</span>
+                {t.doneAt&&<span style={{fontSize:10,color:C.sub,flexShrink:0}}>{t.doneAt.split(",")[1]||""}</span>}
+                {(t.photos||[]).length>0&&<span style={{...S.pil(C.teal,true),cursor:"pointer",fontSize:11}} onClick={()=>window.open(t.photos[t.photos.length-1].url,"_blank")}>📸 {t.photos.length}</span>}
+                <button onClick={e=>{e.stopPropagation();taskFileRefs.current[t.id]?.click();}} style={{...S.btnSm("teal"),padding:"3px 8px",fontSize:11}} disabled={taskPhotoUploading===t.id} title="Upload photo">
+                  {taskPhotoUploading===t.id?<span className="spin"/>:"📸"}
+                </button>
+                <button onClick={e=>{e.stopPropagation();taskCamRefs.current[t.id]?.click();}} style={{...S.btnSm("p"),padding:"3px 8px",fontSize:11}} disabled={taskPhotoUploading===t.id} title="Camera">📷</button>
+                <button onClick={()=>delTask(t.id)} style={{...S.btnSm("r"),padding:"3px 7px",fontSize:11}}>✕</button>
+                <input ref={el=>taskFileRefs.current[t.id]=el} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={e=>{uploadTaskPhoto(t.id,e.target.files[0]);e.target.value="";}}/>
+                <input ref={el=>taskCamRefs.current[t.id]=el} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{uploadTaskPhoto(t.id,e.target.files[0]);e.target.value="";}}/>
+              </div>
+              {(t.photos||[]).length>0&&(
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",padding:"6px 12px 2px 44px"}}>
+                  {t.photos.map((ph,pi)=>(
+                    <img key={pi} src={ph.url} alt={ph.name} style={{width:56,height:56,objectFit:"cover",borderRadius:6,border:`1px solid ${C.b}`,cursor:"pointer"}} onClick={()=>window.open(ph.url,"_blank")}/>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* General round photos */}
+        <div style={{...S.card({marginBottom:14})}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.t,marginBottom:10}}>📷 Round Photos</div>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <button onClick={()=>roundFileRef.current?.click()} style={S.btnSm("p")}>📎 Upload</button>
+            <button onClick={()=>roundCamRef.current?.click()} style={S.btnSm("teal")}>📸 Camera</button>
+            <input ref={roundFileRef} type="file" accept="image/*,application/pdf" multiple style={{display:"none"}} onChange={e=>{Array.from(e.target.files).forEach(f=>uploadRoundPhoto(f));e.target.value="";}}/>
+            <input ref={roundCamRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{uploadRoundPhoto(e.target.files[0]);e.target.value="";}}/>
+          </div>
+          {(round.roundPhotos||[]).length>0&&(
+            <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+              {(round.roundPhotos||[]).map((ph,i)=>(
+                <img key={i} src={ph.url} alt={ph.name} style={{width:72,height:72,objectFit:"cover",borderRadius:8,border:`1px solid ${C.b}`,cursor:"pointer"}} onClick={()=>window.open(ph.url,"_blank")}/>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Notes */}
+        <div style={S.card()}>
+          <div style={{fontSize:13,fontWeight:700,color:C.t,marginBottom:8}}>📝 Round Notes</div>
+          <textarea style={{...S.ta,minHeight:72}} value={round.notes||""} onChange={e=>{const r=getRound(selDate);saveRound(selDate,{...r,notes:e.target.value});}} placeholder="Clinical observations, management changes, consultant remarks..."/>
+        </div>
+      </div>
+    </div>
+  );
+}
+   </div>
+
+        {/* Notes */}
+        <div style={S.card()}>
+          <div style={{fontSize:13,fontWeight:700,color:C.t,marginBottom:8}}>📝 Round Notes</div>
+          <textarea style={{...S.ta,minHeight:72}} value={round.notes||""} onChange={e=>{const r=getRound(selDate);saveRound(selDate,{...r,notes:e.target.value});}} placeholder="Clinical observations, management changes, consultant remarks for today's round..."/>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+function OpPhotosPanel({patient,onClose}){
+  const storKey=`op_photos_${patient.id}`;
+  const [photos,setPhotos]=useState(()=>LS.g(storKey,{preop:[],intraop:[],postop:[]}));
+  const [activeTab,setActiveTab]=useState("preop");
+  const [uploading,setUploading]=useState(false);
+  const fileRef=useRef();
+  const camRef=useRef();
+
+  useEffect(()=>LS.s(storKey,photos),[photos]);
+
+  const upload=async(file,cat)=>{
+    if(!file)return;
+    setUploading(true);
+    let url;
+    try{url=await DB.uploadFile(`${patient.id}/op/${cat}`,file);}
+    catch(e){url=await new Promise(res=>{const r=new FileReader();r.onload=ev=>res(ev.target.result);r.readAsDataURL(file);});}
+    setPhotos(p=>({...p,[cat]:[...(p[cat]||[]),{url,name:file.name,ts:Date.now(),caption:""}]}));
+    setUploading(false);
+  };
+
+  const updateCaption=(cat,idx,val)=>setPhotos(p=>({...p,[cat]:p[cat].map((ph,i)=>i===idx?{...ph,caption:val}:ph)}));
+  const delPhoto=(cat,idx)=>setPhotos(p=>({...p,[cat]:p[cat].filter((_,i)=>i!==idx)}));
+
+  const exportPhotos=()=>{
+    const cats=[{k:"preop",l:"Pre-Operative"},{k:"intraop",l:"Intra-Operative"},{k:"postop",l:"Post-Operative"}];
+    const w=window.open("","_blank");
+    w.document.write(`<html><head><title>Op Photos - ${patient.name}</title>
+    <style>body{font-family:Arial;font-size:10pt;margin:15mm}
+    h1{font-size:13pt;color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:5px}
+    h2{font-size:11pt;color:#1B3A6B;margin:16px 0 8px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+    .ph img{width:100%;border-radius:6px;border:1px solid #ddd}
+    .cap{font-size:8.5pt;color:#555;margin-top:3px;text-align:center}
+    .info{background:#f5f7ff;padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:10pt}
+    </style></head><body>
+    <h1>GRANT MEDICAL COLLEGE HOSPITAL, MUMBAI<br><span style="font-size:10pt;font-weight:normal">Dept. of Plastic & Reconstructive Surgery — Operative Photo Documentation</span></h1>
+    <div class="info"><b>Patient:</b> ${patient.name} &nbsp;·&nbsp; <b>IPD:</b> ${patient.id} &nbsp;·&nbsp; <b>Age/Gender:</b> ${patient.age}y / ${patient.gender}<br><b>Diagnosis:</b> ${patient.diagnosis} &nbsp;·&nbsp; <b>Admitted:</b> ${patient.admitDate||"—"} &nbsp;·&nbsp; <b>Resident:</b> Dr. ${patient.resident||"—"}</div>
+    ${cats.map(({k,l})=>{
+      const phs=photos[k]||[];
+      if(!phs.length)return`<h2>${l}</h2><p style="color:#888;font-size:9pt;font-style:italic">No photos added</p>`;
+      return`<h2>${l} (${phs.length} photos)</h2><div class="grid">${phs.map(ph=>`<div class="ph"><img src="${ph.url}" onerror="this.style.display='none'"/><div class="cap">${ph.caption||ph.name}</div></div>`).join("")}</div>`;
+    }).join("")}
+    <div style="margin-top:20px;font-size:8.5pt;color:#888">Exported: ${new Date().toLocaleString("en-IN")} · GMC Plastics PMS</div>
+    </body></html>`);
+    w.document.close();w.print();
+  };
+
+  const TABS=[{id:"preop",l:"Pre-Op",icon:"🔵",color:"#3B82F6"},{id:"intraop",l:"Intra-Op",icon:"🔴",color:"#EF4444"},{id:"postop",l:"Post-Op",icon:"🟢",color:"#22C55E"}];
+  const curTab=TABS.find(t=>t.id===activeTab);
+  const curPhotos=photos[activeTab]||[];
+
+  return(
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.88)",zIndex:400,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"16px 12px",overflowY:"auto"}}>
+      <div style={{background:C.panel,border:`1px solid ${C.b}`,borderRadius:16,padding:20,width:"100%",maxWidth:900}} className="fu">
+
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>📸 Operative Photos</div>
+            <div style={{fontSize:12,color:C.sub,marginTop:2}}>{patient.name} · {patient.diagnosis}</div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={exportPhotos} style={S.btnSm("g")}>🖨️ Export PDF</button>
+            <button onClick={onClose} style={S.btnSm()}>✕ Close</button>
+          </div>
+        </div>
+
+        {/* Phase selector */}
+        <div style={{display:"flex",gap:10,marginBottom:14}}>
+          {TABS.map(t=>(
+            <div key={t.id} style={{flex:1,padding:"12px 10px",borderRadius:12,background:activeTab===t.id?`${t.color}18`:C.card,border:`2px solid ${activeTab===t.id?t.color:C.b}`,cursor:"pointer",textAlign:"center",transition:"all 0.15s"}} onClick={()=>setActiveTab(t.id)}>
+              <div style={{fontSize:22,marginBottom:3}}>{t.icon}</div>
+              <div style={{fontSize:13,fontWeight:700,color:activeTab===t.id?t.color:C.sub}}>{t.l}</div>
+              <div style={{fontSize:11,color:C.sub,marginTop:2}}>{(photos[t.id]||[]).length} photos</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Upload bar */}
+        <div style={{display:"flex",gap:8,marginBottom:14,padding:"12px 14px",background:C.card,borderRadius:10,border:`1px solid ${C.b}`,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{flex:1,fontSize:13,fontWeight:600,color:curTab.color}}>{curTab.icon} Adding to: <b>{curTab.l}</b></div>
+          <button onClick={()=>fileRef.current?.click()} style={S.btnSm("p")} disabled={uploading}>{uploading?<span className="spin"/>:"📎"} Upload</button>
+          <button onClick={()=>camRef.current?.click()} style={S.btnSm("teal")} disabled={uploading}>📸 Camera</button>
+          <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple style={{display:"none"}} onChange={e=>{Array.from(e.target.files).forEach(f=>upload(f,activeTab));e.target.value="";}}/>
+          <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{upload(e.target.files[0],activeTab);e.target.value="";}}/>
+        </div>
+
+        {/* Grid */}
+        {curPhotos.length===0?(
+          <div style={{textAlign:"center",padding:"48px 20px",border:`2px dashed ${C.b}`,borderRadius:12,color:C.sub}}>
+            <div style={{fontSize:44,marginBottom:10}}>{curTab.icon}</div>
+            <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>No {curTab.l} photos yet</div>
+            <div style={{fontSize:12}}>Tap Upload or Camera above to add photos</div>
+          </div>
+        ):(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:12}}>
+            {curPhotos.map((ph,i)=>(
+              <div key={i} style={S.card({padding:10})}>
+                {ph.url.startsWith("data:image")||ph.url.startsWith("http")?
+                  <img src={ph.url} alt={ph.name} style={{width:"100%",height:140,objectFit:"cover",borderRadius:8,cursor:"pointer",marginBottom:8,border:`1px solid ${C.b}`}} onClick={()=>window.open(ph.url,"_blank")}/>:
+                  <div style={{width:"100%",height:140,background:C.bg,borderRadius:8,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",marginBottom:8,border:`1px solid ${C.b}`,cursor:"pointer"}} onClick={()=>window.open(ph.url,"_blank")}>
+                    <span style={{fontSize:36,marginBottom:6}}>📄</span>
+                    <span style={{fontSize:11,color:C.sub,textAlign:"center",padding:"0 8px"}}>{ph.name}</span>
+                  </div>
+                }
+                <input style={{...S.inp,fontSize:11,padding:"5px 8px",marginBottom:6}} value={ph.caption||""} onChange={e=>updateCaption(activeTab,i,e.target.value)} placeholder="Add caption..."/>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>window.open(ph.url,"_blank")} style={{...S.btnSm("p"),flex:1,justifyContent:"center"}}>View</button>
+                  <button onClick={()=>delPhoto(activeTab,i)} style={S.btnSm("r")}>🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{marginTop:14,fontSize:12,color:C.sub,textAlign:"center",borderTop:`1px solid ${C.b}`,paddingTop:12}}>Photos saved locally & to Supabase · Export PDF prints all 3 phases for case records</div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHOTO DRIVE — organised by category > patient > phase
+// ═══════════════════════════════════════════════════════════
+function PhotoDrive({pts,protos,onClose}){
+  const [selCat,setSelCat]=useState("All");
+  const [selPt,setSelPt]=useState(null);
+  const [search,setSearch]=useState("");
+  const [exporting,setExporting]=useState(false);
+
+  // Gather all categories from protocols
+  const categories=["All",...[...new Set(pts.map(p=>protos[p.diagnosis]?.category||"Other").filter(Boolean))].sort()];
+
+  const filteredPts=pts.filter(p=>{
+    const catOk=selCat==="All"||(protos[p.diagnosis]?.category||"Other")===selCat;
+    const searchOk=!search||p.name.toLowerCase().includes(search.toLowerCase())||p.id.toLowerCase().includes(search.toLowerCase())||p.diagnosis.toLowerCase().includes(search.toLowerCase());
+    return catOk&&searchOk;
+  });
+
+  const getPtPhotos=pid=>{
+    const op=LS.g(`op_photos_${pid}`,{preop:[],intraop:[],postop:[]});
+    const wr=LS.g(`wr_${pid}`,[]);
+    const wrPhotos=wr.flatMap(r=>[...(r.roundPhotos||[]),...(r.tasks||[]).flatMap(t=>t.photos||[])]);
+    return{preop:op.preop||[],intraop:op.intraop||[],postop:op.postop||[],ward:wrPhotos};
+  };
+
+  const totalPhotos=pid=>{const ph=getPtPhotos(pid);return ph.preop.length+ph.intraop.length+ph.postop.length+ph.ward.length;};
+
+  const exportPatientFolder=async(pt)=>{
+    setExporting(pt.id);
+    const ph=getPtPhotos(pt.id);
+    const cat=protos[pt.diagnosis]?.category||"Other";
+    const w=window.open("","_blank");
+    const sections=[
+      {k:"preop",l:"Pre-Operative Photos",icon:"🔵",photos:ph.preop},
+      {k:"intraop",l:"Intra-Operative Photos",icon:"🔴",photos:ph.intraop},
+      {k:"postop",l:"Post-Operative Photos",icon:"🟢",photos:ph.postop},
+      {k:"ward",l:"Ward Round Photos",icon:"🩺",photos:ph.ward},
+    ];
+    w.document.write(`<!DOCTYPE html><html><head><title>${cat} / ${pt.name} / ${pt.id}</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:10pt;margin:12mm;color:#1a1a2e}
+      h1{font-size:14pt;color:#1B3A6B;border-bottom:3px solid #1B3A6B;padding-bottom:6px;margin-bottom:4px}
+      h2{font-size:11pt;color:#1B3A6B;margin:20px 0 6px;padding:6px 12px;background:#f0f4ff;border-left:4px solid #1B3A6B}
+      h3{font-size:10pt;color:#444;margin:14px 0 8px}
+      .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+      .ph{break-inside:avoid;border:1px solid #dde;border-radius:8px;overflow:hidden}
+      .ph img{width:100%;height:160px;object-fit:cover;display:block}
+      .cap{font-size:8pt;color:#555;padding:4px 6px;text-align:center;background:#fafbff}
+      .info{background:#f0f4ff;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:10pt;border:1px solid #d0d8f0}
+      .info td{padding:3px 12px 3px 0;vertical-align:top}
+      .info td:first-child{font-weight:700;color:#1B3A6B;white-space:nowrap}
+      .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:9pt;font-weight:700;background:#e8f0fe;color:#1B3A6B}
+      .empty{color:#999;font-style:italic;font-size:9pt;padding:8px 0}
+      .ft{margin-top:24px;font-size:8pt;color:#999;border-top:1px solid #eee;padding-top:8px;text-align:right}
+      @media print{.noPrint{display:none}}
+    </style></head><body>
+    <h1>📁 ${cat} &nbsp;›&nbsp; ${pt.name} &nbsp;›&nbsp; ${pt.id}</h1>
+    <table class="info">
+      <tr><td>Patient Name</td><td>${pt.name}</td><td>IPD Number</td><td>${pt.id}</td></tr>
+      <tr><td>Age / Gender</td><td>${pt.age}y / ${pt.gender}</td><td>Ward</td><td>${pt.ward}</td></tr>
+      <tr><td>Diagnosis</td><td colspan="3"><span class="badge">${pt.diagnosis}</span></td></tr>
+      <tr><td>Category</td><td>${cat}</td><td>Admitted</td><td>${pt.admitDate||"—"}</td></tr>
+      <tr><td>Resident</td><td>Dr. ${pt.resident||"—"}</td><td>Status</td><td>${pt.status||"—"}</td></tr>
+      ${pt.notes?`<tr><td>Notes</td><td colspan="3">${pt.notes}</td></tr>`:""}
+    </table>
+    ${sections.map(({l,icon,photos})=>`
+      <h2>${icon} ${l} (${photos.length})</h2>
+      ${photos.length===0?`<p class="empty">No photos in this section</p>`:`
+      <div class="grid">
+        ${photos.map(ph=>`<div class="ph">
+          ${ph.url.startsWith("data:image")||ph.url.startsWith("http")?`<img src="${ph.url}" onerror="this.style.display='none'"/>`:`<div style="height:160px;display:flex;align-items:center;justify-content:center;background:#f5f5f5;font-size:28px">📄</div>`}
+          <div class="cap">${ph.caption||ph.name||"Photo"}</div>
+        </div>`).join("")}
+      </div>`}
+    `).join("")}
+    <div class="ft">Category: ${cat} &nbsp;·&nbsp; Patient: ${pt.name} &nbsp;·&nbsp; IPD: ${pt.id} &nbsp;·&nbsp; Total Photos: ${sections.reduce((a,s)=>a+s.photos.length,0)} &nbsp;·&nbsp; Exported: ${new Date().toLocaleString("en-IN")} &nbsp;·&nbsp; GMC Plastics PMS</div>
+    </body></html>`);
+    w.document.close();
+    setTimeout(()=>w.print(),600);
+    setExporting(null);
+  };
+
+  const exportCategoryFolder=async(cat)=>{
+    const catPts=pts.filter(p=>(protos[p.diagnosis]?.category||"Other")===cat);
+    const w=window.open("","_blank");
+    w.document.write(`<!DOCTYPE html><html><head><title>📁 ${cat} — All Patients</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:10pt;margin:12mm}
+      h1{font-size:14pt;color:#1B3A6B;border-bottom:3px solid #1B3A6B;padding-bottom:6px}
+      h2{font-size:12pt;color:#1B3A6B;margin:24px 0 6px;padding:8px 14px;background:#f0f4ff;border-left:4px solid #1B3A6B;border-radius:0 8px 8px 0}
+      h3{font-size:10pt;color:#444;margin:12px 0 6px}
+      .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+      .ph{break-inside:avoid}.ph img{width:100%;height:120px;object-fit:cover;border-radius:6px;border:1px solid #dde}
+      .cap{font-size:7.5pt;color:#666;text-align:center;margin-top:2px}
+      .ptinfo{font-size:9pt;color:#444;margin-bottom:6px;padding:6px 10px;background:#fafbff;border-radius:6px;border:1px solid #e8eaf0}
+      .empty{color:#aaa;font-style:italic;font-size:9pt}
+      .divider{border:none;border-top:2px dashed #dde;margin:20px 0}
+      .ft{margin-top:20px;font-size:8pt;color:#999;border-top:1px solid #eee;padding-top:8px;text-align:right}
+    </style></head><body>
+    <h1>📁 ${cat} — All Patient Photo Records (${catPts.length} patients)</h1>
+    ${catPts.map(pt=>{
+      const ph=getPtPhotos(pt.id);
+      const allPh=[...ph.preop,...ph.intraop,...ph.postop];
+      return`<h2>👤 ${pt.name} &nbsp;·&nbsp; ${pt.id}</h2>
+      <div class="ptinfo"><b>Diagnosis:</b> ${pt.diagnosis} &nbsp;·&nbsp; <b>Age/Gender:</b> ${pt.age}y/${pt.gender} &nbsp;·&nbsp; <b>Admitted:</b> ${pt.admitDate||"—"} &nbsp;·&nbsp; <b>Resident:</b> Dr. ${pt.resident||"—"}</div>
+      ${allPh.length===0?`<p class="empty">No operative photos stored for this patient</p>`:`
+      ${[{l:"Pre-Op",photos:ph.preop},{l:"Intra-Op",photos:ph.intraop},{l:"Post-Op",photos:ph.postop}].filter(s=>s.photos.length>0).map(s=>`
+        <h3>${s.l} (${s.photos.length})</h3>
+        <div class="grid">${s.photos.map(p=>`<div class="ph">${p.url.startsWith("data:image")||p.url.startsWith("http")?`<img src="${p.url}" onerror="this.style.display='none'"/>`:`<div style="height:120px;display:flex;align-items:center;justify-content:center;background:#f5f5f5;font-size:24px">📄</div>`}<div class="cap">${p.caption||p.name||""}</div></div>`).join("")}</div>
+      `).join("")}`}
+      <hr class="divider"/>`;
+    }).join("")}
+    <div class="ft">Category: ${cat} &nbsp;·&nbsp; ${catPts.length} patients &nbsp;·&nbsp; Exported: ${new Date().toLocaleString("en-IN")} &nbsp;·&nbsp; GMC Plastics PMS</div>
+    </body></html>`);
+    w.document.close();
+    setTimeout(()=>w.print(),600);
+  };
+
+  return(
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.88)",zIndex:400,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"16px 12px",overflowY:"auto"}}>
+      <div style={{background:C.panel,border:`1px solid ${C.b}`,borderRadius:16,padding:20,width:"100%",maxWidth:960}} className="fu">
+
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>📁 Photo Drive</div>
+            <div style={{fontSize:12,color:C.sub,marginTop:2}}>Organised by Category → Patient → Pre/Intra/Post-Op</div>
+          </div>
+          <button onClick={onClose} style={S.btnSm()}>✕ Close</button>
+        </div>
+
+        {/* Search + Category filter */}
+        <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+          <input style={{...S.inp,flex:1,minWidth:200}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search patient name, IPD, diagnosis..."/>
+        </div>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:16}}>
+          {categories.map(cat=>(
+            <button key={cat} onClick={()=>{setSelCat(cat);setSelPt(null);}} style={{...S.btnSm(selCat===cat?"p":null),fontSize:12}}>
+              {cat}
+              {cat!=="All"&&<span style={{marginLeft:4,opacity:0.7}}>({pts.filter(p=>(protos[p.diagnosis]?.category||"Other")===cat).length})</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* Category export button */}
+        {selCat!=="All"&&(
+          <div style={{...S.card({background:`${C.accent}08`,border:`1px solid ${C.accent}25`,marginBottom:14}),display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:22}}>📁</span>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,color:C.t}}>{selCat}</div>
+              <div style={{fontSize:12,color:C.sub}}>{filteredPts.length} patients · Export entire category as one PDF</div>
+            </div>
+            <button onClick={()=>exportCategoryFolder(selCat)} style={S.btnSm("g")}>🖨️ Export Full Category</button>
+          </div>
+        )}
+
+        {/* Patient grid */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:12}}>
+          {filteredPts.map(pt=>{
+            const ph=getPtPhotos(pt.id);
+            const total=ph.preop.length+ph.intraop.length+ph.postop.length+ph.ward.length;
+            const cat=protos[pt.diagnosis]?.category||"Other";
+            const catColor=protos[pt.diagnosis]?.color||C.accent;
+            const isOpen=selPt===pt.id;
+            return(
+              <div key={pt.id} style={{...S.card({borderTop:`3px solid ${catColor}`,padding:0,overflow:"hidden"})}}>
+                {/* Patient header */}
+                <div style={{padding:"12px 14px",cursor:"pointer",background:isOpen?`${catColor}10`:"transparent"}} onClick={()=>setSelPt(isOpen?null:pt.id)}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,color:C.t,fontSize:14,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{pt.name}</div>
+                      <div style={{fontSize:11,color:C.accent,fontFamily:"monospace",marginTop:1}}>{pt.id}</div>
+                      <div style={{fontSize:11,color:catColor,marginTop:2,fontWeight:600}}>{pt.diagnosis}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
+                      <div style={{fontSize:20,fontWeight:800,color:total>0?catColor:C.sub}}>{total}</div>
+                      <div style={{fontSize:10,color:C.sub}}>photos</div>
+                    </div>
+                  </div>
+                  {/* Phase mini badges */}
+                  <div style={{display:"flex",gap:5,marginTop:8,flexWrap:"wrap"}}>
+                    {[{l:"Pre",c:"#3B82F6",n:ph.preop.length},{l:"Intra",c:"#EF4444",n:ph.intraop.length},{l:"Post",c:"#22C55E",n:ph.postop.length},{l:"Ward",c:C.teal,n:ph.ward.length}].map(x=>(
+                      <span key={x.l} style={{fontSize:10,padding:"2px 7px",borderRadius:10,background:`${x.c}18`,color:x.c,fontWeight:700,border:`1px solid ${x.c}30`}}>{x.l} {x.n}</span>
+                    ))}
+                  </div>
+                </div>
+                {/* Expanded: photo preview + export */}
+                {isOpen&&(
+                  <div className="fu" style={{borderTop:`1px solid ${C.b}`,padding:"10px 14px",background:C.bg}}>
+                    {/* Latest photos preview */}
+                    {total>0&&(
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                        {[...ph.preop,...ph.intraop,...ph.postop].slice(-6).map((p,i)=>(
+                          p.url.startsWith("data:image")||p.url.startsWith("http")?
+                          <img key={i} src={p.url} alt="" style={{width:56,height:56,objectFit:"cover",borderRadius:6,border:`1px solid ${C.b}`,cursor:"pointer"}} onClick={()=>window.open(p.url,"_blank")}/>:
+                          <div key={i} style={{width:56,height:56,background:C.card,borderRadius:6,border:`1px solid ${C.b}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,cursor:"pointer"}} onClick={()=>window.open(p.url,"_blank")}>📄</div>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{display:"flex",gap:6}}>
+                      <button onClick={()=>exportPatientFolder(pt)} style={{...S.btnSm("g"),flex:1,justifyContent:"center"}} disabled={exporting===pt.id}>
+                        {exporting===pt.id?<span className="spin"/>:"🖨️"} Export Patient Folder
+                      </button>
+                    </div>
+                    {total===0&&<div style={{fontSize:12,color:C.sub,textAlign:"center",padding:"8px 0"}}>No photos stored yet for this patient</div>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {filteredPts.length===0&&<div style={{textAlign:"center",padding:48,color:C.sub}}>No patients found for selected filter</div>}
+
+        <div style={{marginTop:14,fontSize:12,color:C.sub,textAlign:"center",borderTop:`1px solid ${C.b}`,paddingTop:12}}>
+          💡 Export Patient Folder → save as PDF → upload to Google Drive under the matching category folder
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// OT LIST GENERATOR
+// ═══════════════════════════════════════════════════════════
+function OTListPanel({pts,protos,user,onClose}){
+  const [otDate,setOtDate]=useState(new Date().toISOString().split("T")[0]);
+  const [otNo,setOtNo]=useState("OT 1");
+  const [startTime,setStartTime]=useState("08:00");
+  const [surgeon,setSurgeon]=useState(`Dr. ${user.name}`);
+  const [anaesthetist,setAnaesthetist]=useState("");
+  const [scrubNurse,setScrubNurse]=useState("");
+  const [selectedPts,setSelectedPts]=useState([]);
+  const [search,setSearch]=useState("");
+  const [listKey]=useState(`otlist_${new Date().toISOString().split("T")[0]}`);
+
+  // Per-case editable fields
+  const [caseDetails,setCaseDetails]=useState({});
+  const updCase=(pid,k,v)=>setCaseDetails(p=>({...p,[pid]:{...(p[pid]||{}), [k]:v}}));
+  const getCase=(pid)=>caseDetails[pid]||{};
+
+  const ANAESTHESIA=["GA (General Anaesthesia)","SA (Spinal Anaesthesia)","EA (Epidural Anaesthesia)","LA (Local Anaesthesia)","LA + Sedation","TIVA","Nerve Block + Sedation","MAC (Monitored Anaesthesia Care)"];
+
+  const filteredPts=pts.filter(p=>!search||(p.name.toLowerCase().includes(search.toLowerCase())||p.id.toLowerCase().includes(search.toLowerCase())||p.diagnosis.toLowerCase().includes(search.toLowerCase())));
+
+  const togglePt=(pt)=>{
+    setSelectedPts(prev=>{
+      if(prev.find(x=>x.id===pt.id)) return prev.filter(x=>x.id!==pt.id);
+      // Pre-fill case details from patient data
+      setCaseDetails(p=>({...p,[pt.id]:{
+        procedure:pt.diagnosis,
+        anaesthesia:"GA (General Anaesthesia)",
+        surgeon:`Dr. ${user.name}`,
+        position:"Supine",
+        duration:"",
+        consent:"Yes",
+        bloodReq:"No",
+        notes:"",
+        ...(p[pt.id]||{})
+      }}));
+      return [...prev,pt];
+    });
+  };
+
+  const movePt=(idx,dir)=>{
+    const arr=[...selectedPts];
+    const to=idx+dir;
+    if(to<0||to>=arr.length)return;
+    [arr[idx],arr[to]]=[arr[to],arr[idx]];
+    setSelectedPts(arr);
+  };
+
+  const printOTList=()=>{
+    const w=window.open("","_blank");
+    w.document.write(`<!DOCTYPE html><html><head><title>OT List ${otDate}</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:10pt;margin:12mm;color:#111}
+      h1{font-size:14pt;color:#1B3A6B;border-bottom:3px solid #1B3A6B;padding-bottom:6px;margin-bottom:8px}
+      .header-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;background:#f0f4ff;padding:10px 14px;border-radius:8px;border:1px solid #d0d8f0;font-size:10pt}
+      .header-grid div span:first-child{font-weight:700;color:#1B3A6B;display:block;font-size:9pt;text-transform:uppercase;letter-spacing:0.3px}
+      table{width:100%;border-collapse:collapse;margin-top:6px;font-size:9.5pt}
+      th{background:#1B3A6B;color:#fff;padding:7px 10px;text-align:left;font-size:9.5pt}
+      td{padding:7px 10px;border-bottom:1px solid #e8eaf0;vertical-align:top}
+      tr:nth-child(even){background:#f8f9ff}
+      .case-no{font-weight:800;color:#1B3A6B;font-size:12pt}
+      .pt-name{font-weight:700;font-size:10.5pt}
+      .diagnosis{color:#1B3A6B;font-weight:600}
+      .ana{color:#b45309;font-weight:600}
+      .sig-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:30px;padding-top:16px;border-top:2px solid #1B3A6B}
+      .sig-box{text-align:center}
+      .sig-line{border-bottom:1px solid #333;margin-bottom:4px;height:40px}
+      .sig-label{font-size:8.5pt;color:#444}
+      .ft{margin-top:20px;font-size:8pt;color:#888;text-align:right;border-top:1px solid #eee;padding-top:6px}
+      @page{margin:12mm}
+    </style></head><body>
+    <h1>🏥 GRANT MEDICAL COLLEGE & SIR J.J. GROUP OF HOSPITALS<br>
+    <span style="font-size:10pt;font-weight:normal">Dept. of Plastic & Reconstructive Surgery — Operation Theatre List</span></h1>
+    <div class="header-grid">
+      <div><span>Date</span>${otDate}</div>
+      <div><span>OT</span>${otNo}</div>
+      <div><span>Start Time</span>${startTime}</div>
+      <div><span>Surgeon</span>${surgeon}</div>
+      <div><span>Anaesthetist</span>${anaesthetist||"—"}</div>
+      <div><span>Scrub Nurse</span>${scrubNurse||"—"}</div>
+    </div>
+    <table>
+      <thead><tr>
+        <th style="width:36px">#</th>
+        <th>Patient</th>
+        <th>Age/Sex</th>
+        <th>IPD No.</th>
+        <th>Diagnosis</th>
+        <th>Planned Procedure</th>
+        <th>Anaesthesia</th>
+        <th>Surgeon</th>
+        <th>Consent</th>
+        <th>Blood</th>
+        <th>Notes</th>
+      </tr></thead>
+      <tbody>
+      ${selectedPts.map((pt,i)=>{
+        const cd=caseDetails[pt.id]||{};
+        return`<tr>
+          <td class="case-no">${i+1}</td>
+          <td><div class="pt-name">${pt.name}</div><div style="font-size:8.5pt;color:#666">${pt.ward}</div></td>
+          <td>${pt.age}y / ${pt.gender}</td>
+          <td style="font-family:monospace;font-size:9pt">${pt.id}</td>
+          <td class="diagnosis">${pt.diagnosis}</td>
+          <td style="font-weight:600">${cd.procedure||pt.diagnosis}</td>
+          <td class="ana">${cd.anaesthesia||"GA"}</td>
+          <td style="font-size:9pt">${cd.surgeon||surgeon}</td>
+          <td style="text-align:center">${cd.consent||"Yes"}</td>
+          <td style="text-align:center">${cd.bloodReq||"No"}</td>
+          <td style="font-size:9pt;color:#555">${cd.notes||""}</td>
+        </tr>`;
+      }).join("")}
+      </tbody>
+    </table>
+    <div class="sig-grid">
+      <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Surgeon<br>${surgeon}</div></div>
+      <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Anaesthetist<br>${anaesthetist||"_______________"}</div></div>
+      <div class="sig-box"><div class="sig-line"></div><div class="sig-label">OT In-Charge<br>${scrubNurse||"_______________"}</div></div>
+    </div>
+    <div class="ft">Total Cases: ${selectedPts.length} &nbsp;·&nbsp; Generated: ${new Date().toLocaleString("en-IN")} &nbsp;·&nbsp; GMC Plastics PMS &nbsp;·&nbsp; Dr. ${user.name}</div>
+    </body></html>`);
+    w.document.close();
+    setTimeout(()=>w.print(),500);
+  };
+
+  return(
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.88)",zIndex:400,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"16px 12px",overflowY:"auto"}}>
+      <div style={{background:C.panel,border:`1px solid ${C.b}`,borderRadius:16,padding:20,width:"100%",maxWidth:1000}} className="fu">
+
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>🏥 OT List Generator</div>
+            <div style={{fontSize:12,color:C.sub,marginTop:2}}>{selectedPts.length} case{selectedPts.length!==1?"s":""} selected</div>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            {selectedPts.length>0&&<button onClick={printOTList} style={S.btnSm("g")}>🖨️ Print OT List</button>}
+            <button onClick={onClose} style={S.btnSm()}>✕ Close</button>
+          </div>
+        </div>
+
+        {/* OT Details */}
+        <div style={{...S.card({background:`${C.accent}08`,border:`1px solid ${C.accent}25`,marginBottom:16})}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:12}}>📋 OT Session Details</div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}}>
+            <div><L t="OT Date"/><input type="date" style={S.inp} value={otDate} onChange={e=>setOtDate(e.target.value)}/></div>
+            <div><L t="OT Number"/><input style={S.inp} value={otNo} onChange={e=>setOtNo(e.target.value)} placeholder="OT 1"/></div>
+            <div><L t="Start Time"/><input type="time" style={S.inp} value={startTime} onChange={e=>setStartTime(e.target.value)}/></div>
+            <div><L t="Primary Surgeon"/><input style={S.inp} value={surgeon} onChange={e=>setSurgeon(e.target.value)}/></div>
+            <div><L t="Anaesthetist"/><input style={S.inp} value={anaesthetist} onChange={e=>setAnaesthetist(e.target.value)} placeholder="Dr. Name"/></div>
+            <div><L t="Scrub Nurse"/><input style={S.inp} value={scrubNurse} onChange={e=>setScrubNurse(e.target.value)} placeholder="Name"/></div>
+          </div>
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+
+          {/* Left: Patient selector */}
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:C.t,marginBottom:10}}>👤 Select Patients for OT</div>
+            <input style={{...S.inp,marginBottom:10}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name, IPD, diagnosis..."/>
+            <div style={{maxHeight:420,overflowY:"auto"}}>
+              {filteredPts.map(pt=>{
+                const sel=!!selectedPts.find(x=>x.id===pt.id);
+                const pr=PRIO[pt.priority];
+                return(
+                  <div key={pt.id} onClick={()=>togglePt(pt)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,marginBottom:5,background:sel?`${C.ok}10`:C.card,border:`1px solid ${sel?"#22C55E40":C.b}`,cursor:"pointer",transition:"all 0.15s"}}>
+                    <div style={{width:20,height:20,borderRadius:5,border:`2px solid ${sel?"#22C55E":C.mu}`,background:sel?"#22C55E":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {sel&&<span style={{color:"#fff",fontSize:11,fontWeight:900}}>✓</span>}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,color:C.t,fontSize:13,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{pt.name}</div>
+                      <div style={{fontSize:11,color:C.sub}}>{pt.id} · {pt.age}y/{pt.gender}</div>
+                      <div style={{fontSize:11,color:protos[pt.diagnosis]?.color||C.accent,fontWeight:600,marginTop:1}}>{pt.diagnosis}</div>
+                    </div>
+                    <span style={{...S.bdg(pt.priority),flexShrink:0}}>{pr?.i}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right: Selected cases with editable details */}
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:C.t,marginBottom:10}}>📝 OT Case Details ({selectedPts.length})</div>
+            {selectedPts.length===0&&(
+              <div style={{textAlign:"center",padding:"48px 20px",border:`2px dashed ${C.b}`,borderRadius:12,color:C.sub}}>
+                <div style={{fontSize:36,marginBottom:10}}>🏥</div>
+                <div>Select patients from the left to build your OT list</div>
+              </div>
+            )}
+            <div style={{maxHeight:420,overflowY:"auto"}}>
+              {selectedPts.map((pt,i)=>{
+                const cd=getCase(pt.id);
+                return(
+                  <div key={pt.id} style={{...S.card({marginBottom:10,borderLeft:`3px solid ${protos[pt.diagnosis]?.color||C.accent}`})}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <div>
+                        <span style={{fontSize:18,fontWeight:800,color:C.accent,marginRight:8}}>#{i+1}</span>
+                        <span style={{fontWeight:700,color:C.t}}>{pt.name}</span>
+                        <span style={{fontSize:11,color:C.sub,marginLeft:8}}>{pt.age}y/{pt.gender} · {pt.id}</span>
+                      </div>
+                      <div style={{display:"flex",gap:4}}>
+                        {i>0&&<button onClick={()=>movePt(i,-1)} style={{...S.btnSm(),padding:"2px 7px",fontSize:11}}>↑</button>}
+                        {i<selectedPts.length-1&&<button onClick={()=>movePt(i,1)} style={{...S.btnSm(),padding:"2px 7px",fontSize:11}}>↓</button>}
+                        <button onClick={()=>togglePt(pt)} style={{...S.btnSm("r"),padding:"2px 7px",fontSize:11}}>✕</button>
+                      </div>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      <div style={{gridColumn:"1/-1"}}><L t="Planned Procedure"/><input style={S.inp} value={cd.procedure||""} onChange={e=>updCase(pt.id,"procedure",e.target.value)} placeholder={pt.diagnosis}/></div>
+                      <div><L t="Anaesthesia"/>
+                        <select style={S.sel} value={cd.anaesthesia||"GA (General Anaesthesia)"} onChange={e=>updCase(pt.id,"anaesthesia",e.target.value)}>
+                          {ANAESTHESIA.map(a=><option key={a}>{a}</option>)}
+                        </select>
+                      </div>
+                      <div><L t="Surgeon"/><input style={S.inp} value={cd.surgeon||surgeon} onChange={e=>updCase(pt.id,"surgeon",e.target.value)}/></div>
+                      <div><L t="Consent"/><select style={S.sel} value={cd.consent||"Yes"} onChange={e=>updCase(pt.id,"consent",e.target.value)}><option>Yes</option><option>No</option><option>Pending</option></select></div>
+                      <div><L t="Blood Required"/><select style={S.sel} value={cd.bloodReq||"No"} onChange={e=>updCase(pt.id,"bloodReq",e.target.value)}><option>No</option><option>1 PRBC</option><option>2 PRBC</option><option>FFP</option><option>Yes - see notes</option></select></div>
+                      <div style={{gridColumn:"1/-1"}}><L t="Notes / Special Instructions"/><input style={S.inp} value={cd.notes||""} onChange={e=>updCase(pt.id,"notes",e.target.value)} placeholder="e.g. NBM confirmed, implant available, tourniquet needed..."/></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {selectedPts.length>0&&(
+          <div style={{marginTop:14,display:"flex",gap:10,justifyContent:"flex-end",borderTop:`1px solid ${C.b}`,paddingTop:14}}>
+            <button onClick={printOTList} style={{...S.btn("g"),padding:"10px 28px"}}>
+              🖨️ Generate & Print OT List ({selectedPts.length} cases)
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// DAILY MEDICATION CHART
+// ═══════════════════════════════════════════════════════════
+function MedChart({patient,protos,onClose}){
+  const proto=protos[patient.diagnosis]||{};
+  const storKey=`meds_${patient.id}`;
+  const [meds,setMeds]=useState(()=>LS.g(storKey,[]));
+  const [showAdd,setShowAdd]=useState(false);
+  const [form,setForm]=useState({name:"",dose:"",route:"IV",freq:"BD",duration:"5",category:"Antibiotic",notes:""});
+  const today=new Date().toISOString().split("T")[0];
+  const admitDate=patient.admitDate||today;
+
+  useEffect(()=>LS.s(storKey,meds),[meds]);
+
+  const ROUTES=["IV","IM","SC","PO","SL","Topical","Inhalation","PR","Transdermal"];
+  const FREQS=["OD","BD","TDS","QDS","Q4h","Q6h","Q8h","Q12h","Stat","SOS","Nocte","BD-AC","TDS-AC"];
+  const CATS=["Antibiotic","Analgesic","Antifungal","Antiemetic","PPI/H2B","Steroid","Anticoagulant","IV Fluid","Wound Care","Vitamin/Supplement","Other"];
+  const CAT_COLORS={"Antibiotic":"#EF4444","Analgesic":"#F59E0B","Antifungal":"#A855F7","Antiemetic":"#14B8A6","PPI/H2B":"#6366F1","Steroid":"#F97316","Anticoagulant":"#EC4899","IV Fluid":"#3B82F6","Wound Care":"#22C55E","Vitamin/Supplement":"#84CC16","Other":"#94A3B8"};
+
+  const daysSinceAdmit=(dateStr)=>{
+    const d1=new Date(admitDate);const d2=new Date(dateStr||today);
+    return Math.floor((d2-d1)/(1000*60*60*24))+1;
+  };
+
+  const addMed=()=>{
+    if(!form.name.trim())return alert("Drug name required");
+    const startDate=today;
+    const endDate=form.duration?new Date(new Date(today).getTime()+parseInt(form.duration)*86400000).toISOString().split("T")[0]:"";
+    setMeds(p=>[...p,{...form,id:Date.now(),startDate,endDate,active:true,history:[{date:today,action:"Started",by:"Resident",note:""}]}]);
+    setForm({name:"",dose:"",route:"IV",freq:"BD",duration:"5",category:"Antibiotic",notes:""});
+    setShowAdd(false);
+  };
+
+  const continueMed=(id)=>{
+    setMeds(p=>p.map(m=>m.id===id?{...m,history:[...m.history,{date:today,action:"Continued",by:"Resident",note:""}]}:m));
+  };
+
+  const stopMed=(id)=>{
+    const reason=window.prompt("Reason for stopping (optional):");
+    setMeds(p=>p.map(m=>m.id===id?{...m,active:false,history:[...m.history,{date:today,action:"Stopped",by:"Resident",note:reason||""}]}:m));
+  };
+
+  const changeDose=(id)=>{
+    const nd=window.prompt("New dose/freq (e.g. 500mg TDS):");
+    if(!nd)return;
+    setMeds(p=>p.map(m=>m.id===id?{...m,history:[...m.history,{date:today,action:`Changed to: ${nd}`,by:"Resident",note:""}]}:m));
+  };
+
+  const delMed=(id)=>{if(window.confirm("Delete this medication?"))setMeds(p=>p.filter(m=>m.id!==id));};
+
+  const activeMeds=meds.filter(m=>m.active);
+  const stoppedMeds=meds.filter(m=>!m.active);
+
+  // Quick-add from protocol
+  const quickAddFromProto=()=>{
+    const orders=proto.preop_orders||[];
+    orders.forEach(o=>{
+      if(o.toLowerCase().includes("inj.")||o.toLowerCase().includes("tab.")||o.toLowerCase().includes("iv")){
+        const parts=o.replace(/^Inj\.|^Tab\.|^Inj |^Tab /i,"").trim().split(" ");
+        const existing=meds.find(m=>m.name.toLowerCase().includes(parts[0].toLowerCase()));
+        if(!existing){
+          setMeds(prev=>[...prev,{id:Date.now()+Math.random(),name:o,dose:"",route:"IV",freq:"OD",duration:"5",category:"Antibiotic",notes:"From protocol",active:true,startDate:today,endDate:"",history:[{date:today,action:"Started (from protocol)",by:"Resident",note:""}]}]);
+        }
+      }
+    });
+  };
+
+  const printChart=()=>{
+    const w=window.open("","_blank");
+    w.document.write(`<!DOCTYPE html><html><head><title>Medication Chart - ${patient.name}</title>
+    <style>body{font-family:Arial,sans-serif;font-size:9.5pt;margin:12mm}
+    h1{font-size:12pt;color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:5px}
+    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:9pt}
+    th{background:#1B3A6B;color:#fff;padding:5px 8px;text-align:left}
+    td{padding:5px 8px;border-bottom:1px solid #eee;vertical-align:top}
+    tr:nth-child(even){background:#f8f9ff}
+    .info{background:#f0f4ff;padding:7px 12px;border-radius:6px;margin-bottom:10px;font-size:9.5pt}
+    .stopped{color:#aaa;text-decoration:line-through}
+    .sig{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:24px;padding-top:12px;border-top:2px solid #1B3A6B}
+    .sig-line{border-bottom:1px solid #333;height:32px;margin-bottom:3px}
+    .sig-lbl{font-size:8pt;color:#555;text-align:center}
+    </style></head><body>
+    <h1>GRANT MEDICAL COLLEGE HOSPITAL<br><span style="font-size:9pt;font-weight:normal">Dept. of Plastic Surgery — Medication Chart</span></h1>
+    <div class="info"><b>Patient:</b> ${patient.name} &nbsp;·&nbsp; <b>IPD:</b> ${patient.id} &nbsp;·&nbsp; <b>Age/Sex:</b> ${patient.age}y/${patient.gender} &nbsp;·&nbsp; <b>Ward:</b> ${patient.ward}<br>
+    <b>Diagnosis:</b> ${patient.diagnosis} &nbsp;·&nbsp; <b>Admitted:</b> ${admitDate} &nbsp;·&nbsp; <b>Day:</b> D${daysSinceAdmit(today)} &nbsp;·&nbsp; <b>Date:</b> ${today}</div>
+    <table><tr><th>#</th><th>Drug</th><th>Dose</th><th>Route</th><th>Freq</th><th>Start</th><th>End</th><th>Day</th><th>Category</th><th>Status</th></tr>
+    ${meds.map((m,i)=>`<tr class="${m.active?"":"stopped"}">
+      <td>${i+1}</td><td><b>${m.name}</b>${m.notes?`<br><span style="font-size:8pt;color:#888">${m.notes}</span>`:""}</td>
+      <td>${m.dose||"—"}</td><td>${m.route}</td><td>${m.freq}</td>
+      <td>${m.startDate}</td><td>${m.endDate||"—"}</td><td>D${daysSinceAdmit(m.startDate)}</td>
+      <td>${m.category}</td><td>${m.active?"Active":"Stopped"}</td>
+    </tr>`).join("")}
+    </table>
+    <div class="sig">
+      <div><div class="sig-line"></div><div class="sig-lbl">Resident / Dr. ${patient.resident||"___"}</div></div>
+      <div><div class="sig-line"></div><div class="sig-lbl">Sr. Resident / Registrar</div></div>
+      <div><div class="sig-line"></div><div class="sig-lbl">Consultant</div></div>
+    </div>
+    <div style="margin-top:14px;font-size:8pt;color:#888;text-align:right">Printed: ${new Date().toLocaleString("en-IN")} · GMC Plastics PMS</div>
+    </body></html>`);
+    w.document.close();w.print();
+  };
+
+  return(
+    <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.88)",zIndex:400,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"16px 12px",overflowY:"auto"}}>
+      <div style={{background:C.panel,border:`1px solid ${C.b}`,borderRadius:16,padding:20,width:"100%",maxWidth:900}} className="fu">
+
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>💊 Medication Chart</div>
+            <div style={{fontSize:12,color:C.sub,marginTop:2}}>{patient.name} · D{daysSinceAdmit(today)} of admission · {activeMeds.length} active drugs</div>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <button onClick={printChart} style={S.btnSm("g")}>🖨️ Print</button>
+            <button onClick={()=>setShowAdd(true)} style={S.btnSm("p")}>+ Add Drug</button>
+            {proto.preop_orders?.length>0&&<button onClick={quickAddFromProto} style={S.btnSm("teal")}>⚡ Load Protocol Drugs</button>}
+            <button onClick={onClose} style={S.btnSm()}>✕ Close</button>
+          </div>
+        </div>
+
+        {/* Add drug form */}
+        {showAdd&&(
+          <div style={{...S.card({background:`${C.accent}08`,border:`1px solid ${C.accent}30`,marginBottom:16})}} className="fu">
+            <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:12}}>➕ Add Medication</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}}>
+              <div style={{gridColumn:"1/-1"}}><L t="Drug Name *"/><input style={S.inp} value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} placeholder="e.g. Inj. Ceftriaxone 1g" autoFocus/></div>
+              <div><L t="Dose"/><input style={S.inp} value={form.dose} onChange={e=>setForm(p=>({...p,dose:e.target.value}))} placeholder="e.g. 1g"/></div>
+              <div><L t="Route"/><select style={S.sel} value={form.route} onChange={e=>setForm(p=>({...p,route:e.target.value}))}>{ROUTES.map(r=><option key={r}>{r}</option>)}</select></div>
+              <div><L t="Frequency"/><select style={S.sel} value={form.freq} onChange={e=>setForm(p=>({...p,freq:e.target.value}))}>{FREQS.map(f=><option key={f}>{f}</option>)}</select></div>
+              <div><L t="Duration (days)"/><input style={S.inp} type="number" value={form.duration} onChange={e=>setForm(p=>({...p,duration:e.target.value}))} placeholder="5"/></div>
+              <div><L t="Category"/><select style={S.sel} value={form.category} onChange={e=>setForm(p=>({...p,category:e.target.value}))}>{CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+              <div style={{gridColumn:"1/-1"}}><L t="Notes"/><input style={S.inp} value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} placeholder="e.g. for wound infection, review after C/S report"/></div>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:12}}>
+              <button onClick={addMed} style={S.btn("p")}>💊 Add Drug</button>
+              <button onClick={()=>setShowAdd(false)} style={S.btn("ghost")}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* Active medications */}
+        <div style={{fontSize:13,fontWeight:700,color:C.t,marginBottom:10}}>
+          💊 Active Medications <span style={{...S.pil(C.ok,true),marginLeft:8}}>{activeMeds.length}</span>
+        </div>
+        {activeMeds.length===0&&!showAdd&&(
+          <div style={{textAlign:"center",padding:"32px 20px",border:`2px dashed ${C.b}`,borderRadius:12,color:C.sub,marginBottom:14}}>
+            <div style={{fontSize:36,marginBottom:8}}>💊</div>
+            <div>No medications added yet</div>
+            <div style={{fontSize:12,marginTop:4}}>Click "Add Drug" or "Load Protocol Drugs" above</div>
+          </div>
+        )}
+        {activeMeds.map(m=>{
+          const col=CAT_COLORS[m.category]||C.sub;
+          const dayOn=daysSinceAdmit(m.startDate);
+          const daysLeft=m.endDate?Math.ceil((new Date(m.endDate)-new Date())/(1000*60*60*24)):null;
+          return(
+            <div key={m.id} style={{...S.card({marginBottom:8,borderLeft:`3px solid ${col}`})}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                    <span style={{fontWeight:800,color:C.t,fontSize:14}}>{m.name}</span>
+                    {m.dose&&<span style={{fontSize:12,color:C.sub}}>{m.dose}</span>}
+                    <span style={{...S.pil(col,true),fontSize:11}}>{m.category}</span>
+                    <span style={{fontSize:12,color:col,fontWeight:700}}>{m.route} · {m.freq}</span>
+                  </div>
+                  <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:C.sub}}>
+                    <span>Started: {m.startDate} (D{dayOn})</span>
+                    {m.endDate&&<span style={{color:daysLeft!==null&&daysLeft<=1?C.err:C.sub}}>Ends: {m.endDate} {daysLeft!==null?`(${daysLeft>0?daysLeft+"d left":"today"})`:""}</span>}
+                    {m.notes&&<span>📝 {m.notes}</span>}
+                  </div>
+                  {/* History trail */}
+                  {m.history.length>0&&(
+                    <div style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
+                      {m.history.map((h,hi)=>(
+                        <span key={hi} style={{fontSize:10,padding:"2px 7px",borderRadius:10,background:C.bg,border:`1px solid ${C.b}`,color:C.sub}}>
+                          D{daysSinceAdmit(h.date)}: {h.action}{h.note?` (${h.note})`:""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0,flexDirection:"column",alignItems:"flex-end"}}>
+                  <div style={{display:"flex",gap:5}}>
+                    <button onClick={()=>continueMed(m.id)} style={S.btnSm("g")} title="Mark continued today">✓ Continue</button>
+                    <button onClick={()=>changeDose(m.id)} style={S.btnSm("y")} title="Change dose/freq">✏️</button>
+                    <button onClick={()=>stopMed(m.id)} style={S.btnSm("r")} title="Stop drug">⛔ Stop</button>
+                  </div>
+                  <button onClick={()=>delMed(m.id)} style={{...S.btnSm("r"),opacity:0.5,fontSize:10,padding:"2px 6px"}}>🗑️ Delete</button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Stopped medications */}
+        {stoppedMeds.length>0&&(
+          <div style={{marginTop:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.sub,marginBottom:10}}>
+              ⛔ Stopped Medications <span style={{...S.pil(C.err,true),marginLeft:8}}>{stoppedMeds.length}</span>
+            </div>
+            {stoppedMeds.map(m=>{
+              const col=CAT_COLORS[m.category]||C.sub;
+              return(
+                <div key={m.id} style={{...S.card({marginBottom:8,opacity:0.6,borderLeft:`3px solid ${C.b}`})}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{flex:1}}>
+                      <span style={{fontWeight:700,color:C.sub,textDecoration:"line-through",fontSize:13}}>{m.name}</span>
+                      <span style={{fontSize:11,color:C.sub,marginLeft:8}}>{m.dose} · {m.route} · {m.freq}</span>
+                      <span style={{...S.pil(col,true),fontSize:10,marginLeft:8}}>{m.category}</span>
+                      {m.history.slice(-1).map((h,i)=><span key={i} style={{fontSize:11,color:C.sub,marginLeft:8}}>Stopped D{daysSinceAdmit(h.date)}: {h.note||"—"}</span>)}
+                    </div>
+                    <button onClick={()=>delMed(m.id)} style={{...S.btnSm("r"),fontSize:10,padding:"2px 6px"}}>🗑️</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+function PatDetail({patient,onClose,onUpdate,protos,user}){
+  const [tab,setTab]=useState("protocol");
+  const [orders,setOrders]=useState(()=>DB.getOrders(patient.id));
+  const [otxt,setOtxt]=useState(""); const [oby,setOby]=useState("Resident");
+  const [editing,setEditing]=useState(false);
+  const [inQ,setInQ]=useState(()=>LS.g('q_'+patient.id,false));
+  const [showAI,setShowAI]=useState(false);
+  const [showPhotos,setShowPhotos]=useState(false);
+  const [showRehab,setShowRehab]=useState(false);
+  const [showWardRound,setShowWardRound]=useState(false);
+  const [showOpPhotos,setShowOpPhotos]=useState(false);
+  const [showMedChart,setShowMedChart]=useState(false);
+  const proto=protos[patient.diagnosis];
+  useEffect(()=>DB.setOrders(patient.id,orders),[orders,patient.id]);
+  useEffect(()=>LS.s('q_'+patient.id,inQ),[inQ]);
+  const addOrder=()=>{if(!otxt.trim())return;setOrders(p=>[...p,{id:Date.now(),text:otxt.trim(),by:oby,time:new Date().toLocaleString('en-IN'),type:(oby.includes("Senior")||oby.includes("Consult"))?"senior":"res"}]);setOtxt("");};
+  const pr=PRIO[patient.priority];
+  const TABS=[{id:"protocol",l:"📋 Protocol"},{id:"orders",l:`📝 Orders(${orders.length})`},{id:"discharge",l:"🏥 DC Summary"}];
+  return(
+    <>
+    {showAI&&<AIPanel patient={patient} protos={protos} onClose={()=>setShowAI(false)}/>}
+    {showPhotos&&<PhotoPanel patient={patient} onClose={()=>setShowPhotos(false)}/>}
+    {showRehab&&<RehabPanel patient={patient} protos={protos} onClose={()=>setShowRehab(false)}/>}
+    {showWardRound&&<WardRoundPanel patient={patient} onClose={()=>setShowWardRound(false)}/>}
+    {showOpPhotos&&<OpPhotosPanel patient={patient} onClose={()=>setShowOpPhotos(false)}/>}
+    {showMedChart&&<MedChart patient={patient} protos={protos} onClose={()=>setShowMedChart(false)}/>}
+    {editing&&<PatForm existing={patient} onSave={p=>{onUpdate(p);setEditing(false);}} onClose={()=>setEditing(false)} protos={protos}/>}
+    <div style={S.ovl}>
+      <div style={{...S.box(980)}} className="fu">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,gap:8,flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+              <span style={{fontSize:15,fontWeight:800,color:C.t}}>{patient.name}</span>
+              <span style={S.bdg(patient.priority)}>{pr.i} {patient.priority}</span>
+              {inQ&&<Tag label="✓ OT Queue" color={C.ok}/>}
+            </div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:1}}>
+              <span style={{color:C.accent,fontWeight:600,fontFamily:"monospace"}}>{patient.id}</span> · {patient.age}y/{patient.gender} · {patient.ward}
+            </div>
+            <div style={{fontSize:13,color:proto?.color||C.accent,fontWeight:600}}>{patient.diagnosis}</div>
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {patient.allInvestigationsDone&&!inQ&&<button onClick={()=>setInQ(true)} style={S.btnSm("g")}>+ OT</button>}
+            <button onClick={()=>setShowAI(true)} style={S.btnSm("pur")}>🤖 AI</button>
+            <button onClick={()=>setShowPhotos(true)} style={S.btnSm("teal")}>📸</button>
+            <button onClick={()=>setShowRehab(true)} style={S.btnSm("p")}>🏃</button>
+            <button onClick={()=>setShowWardRound(true)} style={S.btnSm("teal")}>🩺 Round</button>
+            <button onClick={()=>setShowOpPhotos(true)} style={S.btnSm("pur")}>📸 Op</button>
+            <button onClick={()=>setShowMedChart(true)} style={S.btnSm("y")}>💊 Meds</button>
+            <button onClick={()=>setEditing(true)} style={S.btnSm("y")}>✏️</button>
+            <button onClick={onClose} style={S.btnSm()}>✕</button>
+          </div>
+        </div>
+        {patient.notes&&<div style={{padding:"6px 12px",background:C.bg,borderRadius:8,border:`1px solid ${C.b}`,marginBottom:10,fontSize:12,color:C.sub}}>{patient.notes.slice(0,120)}</div>}
+        <div style={{display:"flex",gap:3,marginBottom:14,borderBottom:`1px solid ${C.b}`,paddingBottom:8,overflowX:"auto"}}>
+          {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"8px 14px",borderRadius:8,border:"none",cursor:"pointer",background:tab===t.id?"#1D4ED8":"transparent",color:tab===t.id?"#fff":C.sub,fontSize:13,fontWeight:600,fontFamily:"inherit",whiteSpace:"nowrap"}}>{t.l}</button>)}
+        </div>
+        {tab==="protocol"&&<ProtPanel diagnosis={patient.diagnosis} patId={patient.id} protos={protos}/>}
+        {tab==="orders"&&(
+          <div>
+            <div style={S.card()}>
+              <L t="Add Order / Note"/>
+              <select style={{...S.sel,marginBottom:10}} value={oby} onChange={e=>setOby(e.target.value)}>
+                <option>Resident</option><option>Senior/Consultant</option><option>Anaesthesia</option><option>Allied Dept</option><option>Nursing</option>
+              </select>
+              <textarea style={S.ta} value={otxt} onChange={e=>setOtxt(e.target.value)} placeholder="Write order or note..."/>
+              <Sp h={8}/><button onClick={addOrder} style={S.btn("p")}>Add Order</button>
+            </div>
+            {[...orders].reverse().map(o=>(
+              <div key={o.id} style={{...S.card({borderLeft:`3px solid ${o.type==="senior"?"#F59E0B":C.accent}`}),display:"flex",alignItems:"flex-start",gap:10}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:11,color:C.sub,marginBottom:4}}>{o.type==="senior"?"👨‍⚕️":"💊"} {o.by} · {o.time}</div>
+                  <div style={{fontSize:13,color:C.t,lineHeight:1.5}}>{o.text}</div>
+                </div>
+                <button onClick={()=>setOrders(p=>p.filter(x=>x.id!==o.id))} style={{...S.btnSm("r"),flexShrink:0,padding:"3px 7px",fontSize:11}} title="Delete order">🗑️</button>
+              </div>
+            ))}
+            {orders.length===0&&<div style={S.card({textAlign:"center",padding:24,color:C.sub})}>No orders yet</div>}
+          </div>
+        )}
+        {tab==="discharge"&&<DSSummary patient={patient} proto={proto}/>}
+      </div>
+    </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════
+// PATIENT FORM
+// ═══════════════════════════════════
+function PatForm({existing,onSave,onClose,protos}){
+  const [f,setF]=useState(existing||{name:"",age:"",gender:"Male",ward:WARDS[0],diagnosis:Object.keys(protos)[0],priority:"Urgent",resident:"",contact:"",refType:"Ward",notes:"",status:"Pre-Op Workup",allInvestigationsDone:false});
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+  const save=()=>{
+    if(!f.name.trim())return alert("Name required");
+    const id=existing?.id||genIPD();
+    onSave({...f,id,created_at:existing?.created_at||new Date().toISOString(),admitDate:existing?.admitDate||new Date().toISOString().split("T")[0]});
+  };
+  return(
+    <div style={S.ovl}>
+      <div style={S.box(800)} className="fu">
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:800,color:C.t,fontFamily:"Syne"}}>{existing?"Edit Patient":"Add New Patient"}</div>
+            {!existing&&<div style={{fontSize:11,color:C.sub,marginTop:2}}>A unique IPD number will be auto-generated (GMC/PLAST/YYYY/NNNNN)</div>}
+            {existing&&<div style={{fontSize:12,color:C.accent,fontFamily:"monospace",marginTop:2}}>{existing.id}</div>}
+          </div>
+          <button onClick={onClose} style={S.btnSm()}>✕</button>
+        </div>
+        <div style={S.g2}>
+          <div><L t="Full Name *"/><input style={S.inp} value={f.name} onChange={e=>u("name",e.target.value)} placeholder="Patient full name"/></div>
+          <div><L t="Age"/><input style={S.inp} type="number" value={f.age} onChange={e=>u("age",e.target.value)}/></div>
+          <div><L t="Gender"/><select style={S.sel} value={f.gender} onChange={e=>u("gender",e.target.value)}><option>Male</option><option>Female</option><option>Other</option></select></div>
+          <div><L t="Contact"/><input style={S.inp} value={f.contact} onChange={e=>u("contact",e.target.value)} placeholder="Mobile"/></div>
+          <div><L t="Ward"/><select style={S.sel} value={f.ward} onChange={e=>u("ward",e.target.value)}>{WARDS.map(w=><option key={w}>{w}</option>)}</select></div>
+          <div><L t="Priority"/><select style={S.sel} value={f.priority} onChange={e=>u("priority",e.target.value)}>{Object.keys(PRIO).map(p=><option key={p}>{p}</option>)}</select></div>
+          <div><L t="Patient Type"/><select style={S.sel} value={f.refType} onChange={e=>u("refType",e.target.value)}><option value="Ward">Ward Patient</option><option value="Reference">Inter-Dept Ref</option><option value="OPD">OPD</option></select></div>
+          <div><L t="Resident"/><input style={S.inp} value={f.resident} onChange={e=>u("resident",e.target.value)} placeholder="Dr. Name"/></div>
+          <div style={{gridColumn:"1/-1"}}><L t="Diagnosis (Protocol Auto-Loads)"/>
+            <select style={S.sel} value={f.diagnosis} onChange={e=>u("diagnosis",e.target.value)}>{Object.keys(protos).map(d=><option key={d}>{d}</option>)}</select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}><L t="Status"/>
+            <select style={S.sel} value={f.status} onChange={e=>u("status",e.target.value)}>{["Pre-Op Workup","Active Management","Cleared for OT","Post-Op","Discharged"].map(s=><option key={s}>{s}</option>)}</select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}><L t="Clinical Notes"/>
+            <textarea style={S.ta} value={f.notes} onChange={e=>u("notes",e.target.value)} placeholder="Mechanism, clinical description, relevant history..."/>
+          </div>
+          <div style={{gridColumn:"1/-1",display:"flex",alignItems:"center",gap:10}}>
+            <CB chk={f.allInvestigationsDone} on={()=>u("allInvestigationsDone",!f.allInvestigationsDone)}/>
+            <span style={{fontSize:13,color:C.t}}>All investigations done — cleared for OT</span>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:16}}>
+          <button onClick={onClose} style={S.btn("ghost")}>Cancel</button>
+          <button onClick={save} style={S.btn("g")}>💾 {existing?"Update":"Add Patient"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════
+// REFERENCE PORTAL (public)
+// ═══════════════════════════════════
+function RefPortal({protos,allPts,onSubmit,onUpdate}){
+  const [mode,setMode]=useState("home");
+  const [refId,setRefId]=useState("");
+  const [foundPt,setFoundPt]=useState(null);
+  const [notFound,setNotFound]=useState(false);
+  const [f,setF]=useState({name:"",age:"",gender:"Male",ward:"",contact:"",diagnosis:Object.keys(protos)[0],priority:"Semi-Urgent",notes:"",refDept:"",refDoctorName:"",refType:"Reference"});
+  const [done,setDone]=useState(null);
+  const [busy,setBusy]=useState(false);
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const submit=async()=>{
+    if(!f.name.trim()||!f.refDept.trim())return alert("Patient name and department required");
+    setBusy(true);
+    const id=genIPD();
+    const pt={...f,id,created_at:new Date().toISOString(),admitDate:new Date().toISOString().split("T")[0],status:"Pre-Op Workup",allInvestigationsDone:false,resident:""};
+    await onSubmit(pt);setBusy(false);setDone(id);
+  };
+
+  const findPatient=()=>{
+    const query=refId.trim().toUpperCase();
+    const pt=allPts.find(p=>p.id.toUpperCase()===query);
+    if(pt){setFoundPt(pt);setNotFound(false);}
+    else{setFoundPt(null);setNotFound(true);}
+  };
+
+  if(mode==="revisit"&&foundPt){
+    const proto=protos[foundPt.diagnosis]||{};
+    const [photos,setPhotos]=useState(()=>DB.getPhotos(foundPt.id));
+    const [chks,setChks]=useState(()=>DB.getChks(foundPt.id));
+    const [note,setNote]=useState("");
+    const [saved,setSaved]=useState(false);
+    useEffect(()=>DB.setPhotos(foundPt.id,photos),[photos]);
+    useEffect(()=>DB.setChks(foundPt.id,chks),[chks]);
+    const addInvPhoto=(key,ph)=>setPhotos(p=>({...p,inv:{...(p.inv||{}),[key]:[...((p.inv||{})[key]||[]),ph]}}));
+    const tog=k=>setChks(p=>({...p,[k]:!p[k]}));
+    const pr=PRIO[foundPt.priority];
+    return(
+      <div style={{minHeight:"100vh",background:C.bg,padding:"20px 16px"}}>
+        <div style={{maxWidth:680,margin:"0 auto"}}>
+          <button onClick={()=>{setMode("home");setFoundPt(null);setRefId("");}} style={{...S.btnSm(),marginBottom:14}}>← Back</button>
+          <div style={S.card({borderLeft:`4px solid ${pr.c}`,marginBottom:16})}>
+            <div style={{fontWeight:800,fontSize:15,color:C.t,marginBottom:4}}>{foundPt.name}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
+              <span style={{fontSize:11,color:C.accent,fontFamily:"monospace",fontWeight:700}}>{foundPt.id}</span>
+              <span style={S.bdg(foundPt.priority)}>{pr.i} {foundPt.priority}</span>
+              <span style={S.pil(foundPt.status==="Cleared for OT"?C.ok:C.warn,true)}>{foundPt.status}</span>
+            </div>
+            <div style={{fontSize:13,color:proto.color||C.accent,fontWeight:600}}>{foundPt.diagnosis}</div>
+          </div>
+          <div style={S.card({background:`${C.accent}06`,border:`1px solid ${C.accent}25`,marginBottom:14})}>
+            <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:10}}>🧪 Investigation Checklist & Report Upload</div>
+            {(proto.investigations||[]).map((item,i)=>(
+              <InvRow key={i} item={item} idx={i} patId={foundPt.id} checked={!!chks['inv_'+i]} onChk={tog} photos={photos} onAddPhoto={addInvPhoto}/>
+            ))}
+          </div>
+          <div style={S.card()}>
+            <div style={{fontSize:13,fontWeight:700,color:C.t,marginBottom:10}}>📝 Add Clinical Note / Update</div>
+            <textarea style={{...S.ta,marginBottom:10}} value={note} onChange={e=>setNote(e.target.value)} placeholder="Any updates, new findings, urgency change..."/>
+            <button onClick={async()=>{
+              if(!note.trim())return;
+              const orders=DB.getOrders(foundPt.id);
+              const newOrder={id:Date.now(),text:note,by:`${foundPt.refDept||"Referring Dept"} - ${foundPt.refDoctorName||"Dr."}`,time:new Date().toLocaleString('en-IN'),type:"res"};
+              DB.setOrders(foundPt.id,[...orders,newOrder]);
+              const updatedPt={...foundPt,notes:(foundPt.notes||"")+`\n[${new Date().toLocaleString('en-IN')}] ${foundPt.refDept||"Ref"}: ${note}`};
+              await onUpdate(updatedPt);
+              setNote("");setSaved(true);setTimeout(()=>setSaved(false),2500);
+            }} style={S.btn("p")}>
+              Add Update
+            </button>
+            {saved&&<span style={{...S.pil(C.ok,true),marginLeft:10}}>✓ Saved & sent to Plastics team</span>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if(done)return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={S.card({maxWidth:460,textAlign:"center",padding:44})} className="fu">
+        <div style={{fontSize:52,marginBottom:14}}>✅</div>
+        <div style={{fontSize:18,fontWeight:800,color:C.ok,marginBottom:8}}>Reference Submitted!</div>
+        <div style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:20}}>Patient <strong style={{color:C.t}}>{f.name}</strong> sent to Plastics team.</div>
+        <div style={{padding:"14px 18px",background:`${C.accent}10`,borderRadius:12,border:`1px solid ${C.accent}30`,marginBottom:20}}>
+          <div style={{fontSize:11,color:C.sub,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.5px"}}>Your Reference / IPD Number</div>
+          <div style={{fontSize:22,fontWeight:800,color:C.accent,letterSpacing:"2px",fontFamily:"monospace"}}>{done}</div>
+        </div>
+        <div style={{fontSize:12,color:C.mu,marginBottom:20,lineHeight:1.5}}>Save this number. Use it to revisit, check status, and upload investigation reports.</div>
+        <button onClick={()=>{setDone(null);setF({name:"",age:"",gender:"Male",ward:"",contact:"",diagnosis:Object.keys(protos)[0],priority:"Semi-Urgent",notes:"",refDept:"",refDoctorName:"",refType:"Reference"});setMode("home");}} style={S.btn("p",true)}>Done</button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,padding:"20px 16px"}}>
+      <div style={{maxWidth:620,margin:"0 auto"}}>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:12,padding:"14px 20px",background:C.panel,borderRadius:14,border:`1px solid ${C.b}`,marginBottom:14}}>
+            <span style={{fontSize:26}}>🏥</span>
+            <div>
+              <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>GMC Plastic Surgery</div>
+              <div style={{fontSize:12,color:C.sub}}>Inter-Department Reference Portal</div>
+            </div>
+          </div>
+          <div style={{fontSize:12,color:C.mu}}>Grant Medical College & Hospital, Mumbai</div>
+        </div>
+
+        {mode==="home"&&(
+          <div className="fu">
+            <div style={S.g2}>
+              <button onClick={()=>setMode("new")} style={{...S.card({cursor:"pointer",border:`2px solid ${C.accent}30`,textAlign:"center",padding:24,background:`${C.accent}08`}),...{outline:"none"}}}>
+                <div style={{fontSize:32,marginBottom:8}}>📤</div>
+                <div style={{fontWeight:700,color:C.t,fontSize:15}}>New Reference</div>
+                <div style={{fontSize:12,color:C.sub,marginTop:4}}>Send patient to Plastics</div>
+              </button>
+              <button onClick={()=>setMode("revisit")} style={{...S.card({cursor:"pointer",border:`2px solid ${C.teal}30`,textAlign:"center",padding:24,background:`${C.teal}08`}),...{outline:"none"}}}>
+                <div style={{fontSize:32,marginBottom:8}}>🔍</div>
+                <div style={{fontWeight:700,color:C.t,fontSize:15}}>Track Reference</div>
+                <div style={{fontSize:12,color:C.sub,marginTop:4}}>Upload reports & updates</div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mode==="revisit"&&!foundPt&&(
+          <div className="fu">
+            <div style={S.card()}>
+              <div style={{fontSize:14,fontWeight:700,color:C.t,marginBottom:14}}>🔍 Find Your Patient</div>
+              <L t="Enter IPD / Reference Number"/>
+              <input style={{...S.inp,marginBottom:12,fontFamily:"monospace"}} value={refId} onChange={e=>setRefId(e.target.value)} placeholder="GMC/PLAST/2024/01234" onKeyDown={e=>e.key==="Enter"&&findPatient()}/>
+              {notFound&&<div style={{padding:"8px 12px",background:`${C.err}12`,borderRadius:8,color:C.err,fontSize:13,marginBottom:12}}>⚠️ No patient found. Check the ID and try again.</div>}
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={findPatient} style={S.btn("p")}>Find Patient</button>
+                <button onClick={()=>setMode("home")} style={S.btn("ghost")}>← Back</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {mode==="new"&&(
+          <div className="fu">
+            <div style={S.card()}>
+              <div style={{fontSize:13,fontWeight:700,color:C.t,marginBottom:14}}>Referring Department</div>
+              <div style={S.g2}>
+                <div><L t="Department *"/><input style={S.inp} value={f.refDept} onChange={e=>u("refDept",e.target.value)} placeholder="ENT, Ortho, Medicine..."/></div>
+                <div><L t="Doctor *"/><input style={S.inp} value={f.refDoctorName} onChange={e=>u("refDoctorName",e.target.value)} placeholder="Dr. Sharma"/></div>
+              </div>
+            </div>
+            <div style={S.card()}>
+              <div style={{fontSize:13,fontWeight:700,color:C.t,marginBottom:14}}>Patient Details</div>
+              <div style={S.g2}>
+                <div><L t="Patient Name *"/><input style={S.inp} value={f.name} onChange={e=>u("name",e.target.value)}/></div>
+                <div><L t="Age"/><input style={S.inp} type="number" value={f.age} onChange={e=>u("age",e.target.value)}/></div>
+                <div><L t="Gender"/><select style={S.sel} value={f.gender} onChange={e=>u("gender",e.target.value)}><option>Male</option><option>Female</option><option>Other</option></select></div>
+                <div><L t="Contact"/><input style={S.inp} value={f.contact} onChange={e=>u("contact",e.target.value)}/></div>
+                <div><L t="Ward / Bed"/><input style={S.inp} value={f.ward} onChange={e=>u("ward",e.target.value)} placeholder="Ward 5B Bed 12"/></div>
+                <div><L t="Priority"/><select style={S.sel} value={f.priority} onChange={e=>u("priority",e.target.value)}>{Object.keys(PRIO).map(p=><option key={p}>{p}</option>)}</select></div>
+                <div style={{gridColumn:"1/-1"}}><L t="Reason / Diagnosis"/>
+                  <select style={S.sel} value={f.diagnosis} onChange={e=>u("diagnosis",e.target.value)}>{Object.keys(protos).map(d=><option key={d}>{d}</option>)}</select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><L t="Clinical Notes"/>
+                  <textarea style={{...S.ta,minHeight:80}} value={f.notes} onChange={e=>u("notes",e.target.value)} placeholder="Clinical details, what opinion is needed..."/>
+                </div>
+              </div>
+            </div>
+            <button onClick={submit} disabled={busy} style={S.btn("g",true)}>
+              {busy?<><span className="spin"/>Submitting...</>:<>📤 Submit Reference</>}
+            </button>
+            <Sp h={10}/>
+            <button onClick={()=>setMode("home")} style={S.btn("ghost",true)}>← Back</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════
+// PROTOCOL MANAGER
+// ═══════════════════════════════════
+function ProtoManager({protos,onSave}){
+  const [cat,setCat]=useState("All");
+  const [editing,setEditing]=useState(null);
+  const [showNew,setShowNew]=useState(false);
+  const CATS=["All","Trauma","Reconstruction","Oncoplastic","Vascular","Burns & Contracture","Aesthetic & Body","Congenital","Custom"];
+  const SE=({proto,setProto,k,label,icon})=>{
+    const [txt,setTxt]=useState("");const items=proto[k]||[];
+    const add=()=>{if(!txt.trim())return;setProto(p=>({...p,[k]:[...(p[k]||[]),txt.trim()]}));setTxt("");};
+    const rm=i=>setProto(p=>({...p,[k]:items.filter((_,j)=>j!==i)}));
+    return(
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:11,fontWeight:700,color:C.accent,marginBottom:6,textTransform:"uppercase"}}>{icon} {label}</div>
+        {items.map((item,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:4,background:C.bg,padding:"6px 10px",borderRadius:8,border:`1px solid ${C.b}`,alignItems:"center"}}><span style={{flex:1,fontSize:12,color:C.t}}>{item}</span><button onClick={()=>rm(i)} style={S.btnSm("r")}>✕</button></div>)}
+        <div style={{display:"flex",gap:8}}><input style={{...S.inp,flex:1}} value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()} placeholder="Add item, press Enter"/><button onClick={add} style={S.btn("p")}>+</button></div>
+      </div>
+    );
+  };
+  const EM=({proto,name,onSv,onClose})=>{
+    const [p,setP]=useState({...proto});const [n,setN]=useState(name);
+    return(
+      <div style={S.ovl}><div style={{...S.box(900)}} className="fu">
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:14}}><div style={{fontSize:15,fontWeight:800,color:C.t,fontFamily:"Syne"}}>{name?"Edit":"New"} Protocol</div><button onClick={onClose} style={S.btnSm()}>✕</button></div>
+        <div style={S.g2}>
+          <div><L t="Name"/><input style={S.inp} value={n} onChange={e=>setN(e.target.value)}/></div>
+          <div><L t="Category"/><select style={S.sel} value={p.category||"Custom"} onChange={e=>setP(x=>({...x,category:e.target.value}))}>{CATS.filter(c=>c!=="All").map(c=><option key={c}>{c}</option>)}</select></div>
+        </div>
+        <Sp h={8}/><L t="Colour"/><input type="color" style={{...S.inp,height:44,padding:4,marginBottom:14}} value={p.color||"#3B82F6"} onChange={e=>setP(x=>({...x,color:e.target.value}))}/>
+        <div style={S.dv}/>
+        <div style={{maxHeight:480,overflowY:"auto",paddingRight:4}}>
+          <SE proto={p} setProto={setP} k="investigations" label="Investigations" icon="🧪"/>
+          <SE proto={p} setProto={setP} k="preop_checklist" label="Pre-Op Checklist" icon="✅"/>
+          <SE proto={p} setProto={setP} k="preop_orders" label="Pre-Op Orders" icon="📝"/>
+          <SE proto={p} setProto={setP} k="special_consent" label="Special Consent" icon="⚖️"/>
+          <SE proto={p} setProto={setP} k="materials" label="Materials & Equipment" icon="🛒"/>
+          <SE proto={p} setProto={setP} k="intraop" label="Intra-Op" icon="🔪"/>
+          <SE proto={p} setProto={setP} k="postop" label="Post-Op Orders" icon="💊"/>
+          <SE proto={p} setProto={setP} k="rehab" label="Rehabilitation Protocol" icon="🏃"/>
+          <SE proto={p} setProto={setP} k="references" label="References" icon="📚"/>
+        </div>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:14}}>
+          <button onClick={onClose} style={S.btn("ghost")}>Cancel</button>
+          <button onClick={()=>{if(!n.trim())return alert("Name required");onSv(n,p);onClose();}} style={S.btn("g")}>💾 Save</button>
+        </div>
+      </div></div>
+    );
+  };
+  const filt=Object.entries(protos).filter(([,v])=>cat==="All"||v.category===cat);
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:18,fontWeight:800,color:C.t,fontFamily:"Syne"}}>Protocol Manager</div>
+        <button onClick={()=>setShowNew(true)} style={S.btn("p")}>+ New Protocol</button>
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+        {CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={{...S.btnSm(cat===c?"p":""),padding:"5px 12px"}}>{c}</button>)}
+      </div>
+      <div style={S.g2}>
+        {filt.map(([name,proto])=>(
+          <div key={name} style={S.card({borderLeft:`4px solid ${proto.color||C.accent}`})}>
+            <div style={{fontWeight:700,color:C.t,fontSize:13,marginBottom:6}}>{name}</div>
+            <Tag label={proto.category||"General"} color={proto.color||C.accent}/>
+            <div style={{fontSize:11,color:C.sub,marginTop:6,marginBottom:10}}>{(proto.investigations||[]).length} inv · {(proto.materials||[]).length} mat · {(proto.special_consent||[]).length} consent · {(proto.rehab||[]).length} rehab</div>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={()=>setEditing(name)} style={S.btnSm("p")}>✏️ Edit</button>
+              <button onClick={()=>{if(window.confirm(`Delete "${name}"?`)){const u={...protos};delete u[name];onSave(u);}}} style={S.btnSm("r")}>🗑️</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {editing&&<EM proto={protos[editing]} name={editing} onSv={(n,p)=>{const u={...protos};if(n!==editing)delete u[editing];u[n]=p;onSave(u);setEditing(null);}} onClose={()=>setEditing(null)}/>}
+      {showNew&&<EM proto={{name:"",category:"Custom",color:"#3B82F6",investigations:[],preop_checklist:[],preop_orders:[],special_consent:[],materials:[],intraop:[],postop:[],rehab:[],references:[]}} name="" onSv={(n,p)=>{onSave({...protos,[n]:p});setShowNew(false);}} onClose={()=>setShowNew(false)}/>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════
+// PATIENT CARD
+// ═══════════════════════════════════
+function PatCard({patient,onClick,onDel,protos}){
+  const pr=PRIO[patient.priority];
+  const proto=protos[patient.diagnosis];
+  return(
+    <div onClick={()=>onClick(patient)} style={S.card({cursor:"pointer",borderLeft:`4px solid ${pr.c}`,transition:"border-color 0.2s"})} className="fu">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",marginBottom:4}}>
+            <span style={{fontSize:15,fontWeight:800,color:C.t}}>{patient.name}</span>
+            <span style={S.bdg(patient.priority)}>{pr.i} {patient.priority}</span>
+            {patient.allInvestigationsDone&&<Tag label="✓ Cleared" color={C.ok}/>}
+          </div>
+          <div style={{fontSize:11,color:C.accent,fontFamily:"monospace",fontWeight:600,marginBottom:3}}>{patient.id}</div>
+          <div style={{fontSize:12,color:C.sub,marginBottom:3}}>{patient.age}y/{patient.gender} · {patient.ward}</div>
+          <div style={{fontSize:13,color:proto?.color||C.accent,fontWeight:600}}>{patient.diagnosis}</div>
+          {patient.refType==="Reference"&&<div style={{fontSize:11,color:C.purple,marginTop:3}}>📨 {patient.refDept} — Dr. {patient.refDoctorName||"—"}</div>}
+        </div>
+        <div style={{textAlign:"right",flexShrink:0}}>
+          <Tag label={patient.status} color={patient.status==="Cleared for OT"?C.ok:patient.status==="Post-Op"?C.accent:C.warn}/>
+          <div style={{fontSize:11,color:C.sub,marginTop:6}}>Dr. {patient.resident||"—"}</div>
+          <div style={{fontSize:11,color:C.mu,marginBottom:6}}>{patient.admitDate}</div>
+          <button onClick={e=>{e.stopPropagation();if(window.confirm("Delete?"))onDel(patient.id);}} style={S.btnSm("r")}>🗑️</button>
+        </div>
+      </div>
+      {patient.notes&&<div style={{marginTop:7,fontSize:11,color:C.mu,borderTop:`1px solid ${C.b}`,paddingTop:6,lineHeight:1.4}}>{patient.notes.slice(0,100)}{patient.notes.length>100?"...":""}</div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════
+// LOGIN
+// ═══════════════════════════════════
+
+function UserManager({onClose}){
+  const [users,setUsers]=useState([]);
+  const [form,setForm]=useState({username:"",password:"",name:"",role:"resident"});
+  const [busy,setBusy]=useState(false);
+  const [msg,setMsg]=useState("");
+  useEffect(()=>{SB.from('app_users').select('*').order('created_at').then(({data})=>setUsers(data||[]));  },[]);
+  const addUser=async()=>{
+    if(!form.username||!form.password||!form.name)return alert("All fields required");
+    setBusy(true);
+    const{data,error}=await SB.from('app_users').insert(form).select().single();
+    if(data){setUsers(p=>[...p,data]);setForm({username:"",password:"",name:"",role:"resident"});setMsg("✓ User added!");}
+    else alert("Error: "+(error?.message||"unknown"));
+    setBusy(false);setTimeout(()=>setMsg(""),3000);
+  };
+  const delUser=async(id,uname)=>{
+    if(uname==="admin")return alert("Cannot delete admin");
+    if(!window.confirm("Delete @"+uname+"?"))return;
+    await SB.from('app_users').delete().eq('id',id);
+    setUsers(p=>p.filter(u=>u.id!==id));
+  };
+  const resetPw=async(id)=>{
+    const np=window.prompt("Enter new password:");
+    if(!np||!np.trim())return;
+    await SB.from('app_users').update({password:np.trim()}).eq('id',id);
+    alert("Password updated!");
+  };
+  return(
+    <div style={S.ovl}>
+      <div style={{...S.box(680),maxHeight:"90vh",overflowY:"auto"}} className="fu">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+          <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>👥 User Management</div>
+          <button onClick={onClose} style={S.btnSm()}>✕ Close</button>
+        </div>
+        <div style={{...S.card({background:`${C.accent}0D`,border:`1px solid ${C.accent}30`}),marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:12}}>➕ Add New User / Resident</div>
+          <div style={S.g2}>
+            <div><L t="Full Name"/><input style={S.inp} value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} placeholder="Dr. Firstname Lastname"/></div>
+            <div><L t="Username"/><input style={S.inp} value={form.username} onChange={e=>setForm(p=>({...p,username:e.target.value.toLowerCase().replace(/\s+/g,"")}))} placeholder="drfirstname"/></div>
+            <div><L t="Password"/><input style={S.inp} type="text" value={form.password} onChange={e=>setForm(p=>({...p,password:e.target.value}))} placeholder="Set a password"/></div>
+            <div><L t="Role"/>
+              <select style={S.sel} value={form.role} onChange={e=>setForm(p=>({...p,role:e.target.value}))}>
+                <option value="resident">Resident</option>
+                <option value="senior">Sr. Resident</option>
+                <option value="faculty">Faculty</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginTop:12}}>
+            <button onClick={addUser} style={S.btn("p")} disabled={busy}>{busy?<span className="spin"/>:"+"} Add User</button>
+            {msg&&<span style={{...S.pil(C.ok,true)}}>{msg}</span>}
+          </div>
+        </div>
+        <div style={{fontSize:11,color:C.sub,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.5px",fontWeight:700}}>All Users ({users.length})</div>
+        {users.map(u=>(
+          <div key={u.id} style={{...S.card({marginBottom:8}),display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,color:C.t,fontSize:14}}>{u.name}</div>
+              <div style={{fontSize:12,color:C.sub,marginTop:2}}>@{u.username} &nbsp;·&nbsp; <span style={{color:C.accent,fontWeight:600}}>{u.role}</span></div>
+            </div>
+            <div style={{display:"flex",gap:8,flexShrink:0}}>
+              <button onClick={()=>resetPw(u.id)} style={S.btnSm("teal")}>🔑 Reset PW</button>
+              {u.username!=="admin"&&<button onClick={()=>delUser(u.id,u.username)} style={S.btnSm("r")}>🗑️</button>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function Login({onLogin}){
+  const [u,setU]=useState(""); const [p,setP]=useState(""); const [err,setErr]=useState(""); const [busy,setBusy]=useState(false);
+  const login=async()=>{
+    if(!u||!p)return setErr("Enter username and password");
+    setBusy(true);setErr("");
+    try{
+      const{data,error}=await SB.from('app_users').select('*').eq('username',u.trim()).eq('password',p).single();
+      if(data&&!error){LS.s('gmc_sess',{...data,ts:Date.now()});onLogin(data);}
+      else setErr("Invalid username or password");
+    }catch(e){setErr("Login error. Check connection.");}
+    setBusy(false);
+  };
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{width:"100%",maxWidth:380}} className="fu">
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <div style={{width:66,height:66,borderRadius:20,background:`linear-gradient(135deg,#1D4ED8,${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,margin:"0 auto 14px"}}>🏥</div>
+          <div style={{fontSize:26,fontWeight:800,color:C.t,fontFamily:"Syne"}}>GMC Plastics</div>
+          <div style={{fontSize:13,color:C.sub,marginTop:4}}>Dept. of Plastic & Reconstructive Surgery</div>
+          <div style={{fontSize:12,color:C.mu,marginTop:2}}>Grant Medical College & Hospital, Mumbai</div>
+        </div>
+        <div style={S.card()}>
+          <div style={{marginBottom:14}}>
+            <L t="Username"/>
+            <input style={S.inp} value={u} onChange={e=>setU(e.target.value)} placeholder="Enter username" autoCapitalize="none" onKeyDown={e=>e.key==="Enter"&&login()}/>
+          </div>
+          <div style={{marginBottom:16}}>
+            <L t="Password"/>
+            <input style={S.inp} type="password" value={p} onChange={e=>setP(e.target.value)} placeholder="Enter password" onKeyDown={e=>e.key==="Enter"&&login()}/>
+          </div>
+          {err&&<div style={{padding:"8px 12px",background:`${C.err}12`,borderRadius:8,color:C.err,fontSize:13,marginBottom:12}}>⚠️ {err}</div>}
+          <button onClick={login} style={S.btn("p",true)} disabled={busy}>
+            {busy?<><span className="spin"/>Signing in...</>:<>🔐 Sign In</>}
+          </button>
+        </div>
+        <div style={{textAlign:"center",fontSize:11,color:C.mu,marginTop:14}}>Default: drresident / gmc2024</div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════
+function App(){
+  const [user,setUser]=useState(()=>{const s=LS.g('gmc_sess',null);if(s&&Date.now()-s.ts<604800000)return s;return null;});
+  const [view,setView]=useState("dashboard");
+  const [pts,setPts]=useState([]);
+  const [protos,setProtos]=useState(DP);
+  const [loading,setLoading]=useState(true);
+  const [sel,setSel]=useState(null);
+  const [showAdd,setShowAdd]=useState(false);
+  const [navOpen,setNavOpen]=useState(false);
+  const [showUserMenu,setShowUserMenu]=useState(false);
+  const [showUserMgr,setShowUserMgr]=useState(false);
+  const [showPhotoDrive,setShowPhotoDrive]=useState(false);
+  const [showOTList,setShowOTList]=useState(false);
+  const [showLogbook,setShowLogbook]=useState(false);
+  const [search,setSearch]=useState("");
+  const [wf,setWf]=useState("All");
+  const [pf,setPf]=useState("All");
+
+  const isRef=window.location.hash==="#refer";
+
+  useEffect(()=>{
+    (async()=>{
+      const[p,pr]=await Promise.all([DB.getPts(),DB.getProtos()]);
+      setPts(p);setProtos(pr);setLoading(false);
+    })();
+  },[]);
+
+  const addPt=async p=>{await DB.savePt(p);setPts(prev=>[p,...prev.filter(x=>x.id!==p.id)]);};
+  const updPt=async p=>{await DB.savePt(p);setPts(prev=>prev.map(x=>x.id===p.id?p:x));};
+  const delPt=async id=>{await DB.delPt(id);setPts(prev=>prev.filter(x=>x.id!==id));};
+  const saveProtos=async pr=>{setProtos(pr);await DB.saveProtos(pr);};
+  const logout=()=>{LS.s('gmc_sess',null);setUser(null);setNavOpen(false);};
+  const go=(id)=>{setView(id);setNavOpen(false);};
+
+  if(isRef)return<RefPortal protos={protos} allPts={pts} onSubmit={addPt} onUpdate={updPt}/>;
+  if(!user)return<Login onLogin={setUser}/>;
+  if(loading)return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",flexDirection:"column",gap:14}}>
+      <div className="spin" style={{width:36,height:36,border:"3px solid #1E3A5F",borderTopColor:C.accent,borderRadius:"50%"}}></div>
+      <div style={{color:C.sub}}>Loading GMC Plastics v6...</div>
+    </div>
+  );
+
+  const filt=pts.filter(p=>{
+    const s=search.toLowerCase();
+    return(!s||p.name.toLowerCase().includes(s)||p.id.toLowerCase().includes(s)||p.diagnosis.toLowerCase().includes(s)||(p.resident||"").toLowerCase().includes(s)||(p.contact||"").includes(s))
+      &&(wf==="All"||p.ward===wf)&&(pf==="All"||p.priority===pf);
+  });
+  const wardPts=filt.filter(p=>p.refType!=="Reference");
+  const refPts=filt.filter(p=>p.refType==="Reference");
+  const qPts=pts.filter(p=>p.allInvestigationsDone||LS.g('q_'+p.id,false));
+  const shareUrl=`${window.location.href.split('#')[0]}#refer`;
+
+  const NAV=[
+    {id:"dashboard",icon:"🏠",label:"Dashboard"},
+    {id:"ward",icon:"🛏️",label:"Ward Patients",cnt:pts.filter(p=>p.refType!=="Reference").length},
+    {id:"references",icon:"📨",label:"References",cnt:refPts.length},
+    {id:"otqueue",icon:"🏥",label:"OT Queue",cnt:qPts.length},
+    {id:"protocols",icon:"📋",label:"Protocol Manager"},
+  ];
+
+  const SC=({value,label,color,icon,onClick})=>(
+    <div onClick={onClick} style={{background:C.card,border:`1px solid ${C.b}`,borderRadius:12,padding:"14px 16px",borderTop:`3px solid ${color}`,cursor:onClick?"pointer":"default"}}>
+      <div style={{fontSize:24,fontWeight:800,color:C.t}}>{value}</div>
+      <div style={{fontSize:11,color:C.sub,marginTop:3,textTransform:"uppercase"}}>{icon} {label}</div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg}}>
+
+      {/* ─── TOP BAR ─── */}
+      <div style={{position:"sticky",top:0,zIndex:150,background:C.panel,borderBottom:`1px solid ${C.b}`,padding:"0 14px",height:54,display:"flex",alignItems:"center",gap:10}}>
+        {/* Hamburger — simple state toggle, NO portals */}
+        <button
+          onClick={()=>setNavOpen(v=>!v)}
+          style={{background:"transparent",border:`1px solid ${C.b}`,borderRadius:8,width:40,height:40,cursor:"pointer",flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,padding:0}}
+        >
+          <div style={{width:16,height:2,background:C.t,borderRadius:2}}></div>
+          <div style={{width:16,height:2,background:C.t,borderRadius:2}}></div>
+          <div style={{width:16,height:2,background:C.t,borderRadius:2}}></div>
+        </button>
+
+        <div style={{fontWeight:800,color:C.t,fontSize:15,fontFamily:"Syne",flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+          {NAV.find(n=>n.id===view)?.icon} {NAV.find(n=>n.id===view)?.label||"GMC Plastics"}
+        </div>
+
+        <button onClick={()=>setShowAdd(true)} style={{...S.btn("p"),padding:"8px 14px",fontSize:13,flexShrink:0}}>
+          ➕
+        </button>
+
+        <div style={{position:"relative",flexShrink:0}}>
+          <button onClick={()=>setShowUserMenu(v=>!v)} style={{...S.btnSm(),flexShrink:0}} title="My Account">👤</button>
+          {showUserMenu&&(
+            <div className="fu" style={{position:"absolute",right:0,top:46,background:C.panel,border:`1px solid ${C.b}`,borderRadius:12,padding:12,minWidth:210,zIndex:999,boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
+              <div style={{padding:"8px 4px 12px",borderBottom:`1px solid ${C.b}`,marginBottom:10}}>
+                <div style={{fontWeight:800,color:C.t,fontSize:14}}>Dr. {user.name}</div>
+                <div style={{fontSize:12,color:C.sub,marginTop:2}}>{user.role} · @{user.username}</div>
+              </div>
+              {user.role==="admin"&&(
+                <div onClick={()=>{setShowUserMgr(true);setShowUserMenu(false);}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 8px",borderRadius:8,cursor:"pointer",marginBottom:6,background:C.card,border:`1px solid ${C.b}`}}>
+                  <span>👥</span><span style={{fontSize:13,color:C.t,flex:1}}>User Management</span>
+                </div>
+              )}
+              <button onClick={()=>{setShowUserMenu(false);logout();}} style={{...S.btn("r"),width:"100%",fontSize:13,marginTop:4}}>🚪 Sign Out</button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── NAV DRAWER ─── uses simple conditional render, NOT portal ─── */}
+      {navOpen&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:200}}>
+          {/* backdrop */}
+          <div
+            onClick={()=>setNavOpen(false)}
+            style={{position:"absolute",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.6)"}}
+          />
+          {/* drawer */}
+          <div style={{position:"absolute",top:0,left:0,bottom:0,width:270,background:C.panel,borderRight:`1px solid ${C.b}`,display:"flex",flexDirection:"column",zIndex:1}} className="sr">
+            <div style={{padding:"18px 20px",borderBottom:`1px solid ${C.b}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <div style={{width:36,height:36,borderRadius:10,background:`linear-gradient(135deg,#1D4ED8,${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏥</div>
+                <div>
+                  <div style={{fontSize:14,fontWeight:800,color:C.t,fontFamily:"Syne"}}>GMC Plastics</div>
+                  <div style={{fontSize:11,color:C.sub}}>PMS v6</div>
+                </div>
+              </div>
+              <div style={{fontSize:12,color:C.sub}}>Dr. {user.name} · {user.role}</div>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"8px 0"}}>
+              {NAV.map(item=>(
+                <div key={item.id} style={S.navItem(view===item.id)} onClick={()=>go(item.id)}>
+                  <span style={{fontSize:18}}>{item.icon}</span>
+                  <span style={{flex:1}}>{item.label}</span>
+                  {item.cnt!==undefined&&<span style={{background:view===item.id?C.accent:C.card,color:"#fff",borderRadius:10,padding:"2px 8px",fontSize:12,fontWeight:700,border:`1px solid ${C.b}`}}>{item.cnt}</span>}
+                </div>
+              ))}
+              <div style={S.navItem(false)} onClick={()=>{setShowPhotoDrive(true);setNavOpen(false);}}>
+                <span style={{fontSize:18}}>📁</span>
+                <span style={{flex:1}}>Photo Drive</span>
+              </div>
+              <div style={S.navItem(false)} onClick={()=>{setShowOTList(true);setNavOpen(false);}}>
+                <span style={{fontSize:18}}>🏥</span>
+                <span style={{flex:1}}>OT List</span>
+              </div>
+              <div style={S.navItem(false)} onClick={()=>{setShowLogbook(true);setNavOpen(false);}}>
+                <span style={{fontSize:18}}>📚</span>
+                <span style={{flex:1}}>Case Logbook</span>
+              </div>
+            </div>
+            <div style={{padding:"14px 20px",borderTop:`1px solid ${C.b}`}}>
+              <button onClick={logout} style={{...S.btn("r"),width:"100%",fontSize:13}}>🚪 Sign Out</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MAIN ─── */}
+      <div style={{padding:"14px 14px",maxWidth:980,margin:"0 auto"}}>
+
+        {/* Search + filters */}
+        <div style={{marginBottom:14,display:"flex",gap:8,flexWrap:"wrap"}}>
+          <input style={{...S.inp,flex:1,minWidth:160}} placeholder="🔍 Search name, IPD, diagnosis..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          <select style={{...S.sel,width:130}} value={wf} onChange={e=>setWf(e.target.value)}>
+            <option value="All">All Wards</option>{WARDS.map(w=><option key={w}>{w}</option>)}
+          </select>
+          <select style={{...S.sel,width:120}} value={pf} onChange={e=>setPf(e.target.value)}>
+            <option value="All">All Priority</option>{Object.keys(PRIO).map(p=><option key={p}>{p}</option>)}
+          </select>
+        </div>
+
+        {/* DASHBOARD */}
+        {view==="dashboard"&&(
+          <div>
+            <div style={{fontFamily:"Syne",fontSize:20,fontWeight:800,color:C.t,marginBottom:3}}>Dashboard</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:16}}>Dept. of Plastic & Reconstructive Surgery · GMC Mumbai</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:10}}>
+              <SC value={pts.length} label="Total" color={C.accent} icon="🛏️"/>
+              <SC value={pts.filter(p=>p.priority==="Emergency").length} label="Emergency" color="#EF4444" icon="🚨"/>
+              <SC value={qPts.length} label="OT Ready" color={C.ok} icon="✅"/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
+              <SC value={pts.filter(p=>p.priority==="Urgent").length} label="Urgent" color="#FF7043" icon="⚡"/>
+              <SC value={refPts.length} label="References" color={C.purple} icon="📨"/>
+              <SC value={DB.getLogbook().length} label="Log Entries" color={C.teal} icon="📚" onClick={()=>setShowLogbook(true)}/>
+            </div>
+            <div style={S.card()}>
+              <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:10,textTransform:"uppercase"}}>📤 Reference Link</div>
+              <div style={{fontSize:12,color:C.sub,marginBottom:10}}>Share with ENT, Ortho etc. They fill the form → appears in References automatically.</div>
+              <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
+                <input style={{...S.inp,flex:1,minWidth:160,fontSize:12}} readOnly value={shareUrl}/>
+                <button onClick={()=>{navigator.clipboard?.writeText(shareUrl).then(()=>alert("✅ Copied!"));}} style={S.btn("p")}>Copy</button>
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button onClick={()=>window.open(shareUrl,"_blank")} style={{...S.btnSm("p")}}>🔗 Preview</button>
+                <button onClick={()=>window.open("https://wa.me/?text="+encodeURIComponent("GMC Plastic Surgery Reference Form:\n"+shareUrl),"_blank")} style={{...S.btnSm("g")}}>📲 WhatsApp</button>
+              </div>
+            </div>
+            <div style={S.card()}>
+              <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:10,textTransform:"uppercase"}}>Recent Patients</div>
+              {pts.slice(0,6).map(p=>(
+                <div key={p.id} onClick={()=>setSel(p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:`1px solid ${C.b}`,cursor:"pointer",gap:8}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:600,color:C.t,fontSize:14}}>{p.name}</div>
+                    <div style={{fontSize:11,color:C.accent,fontFamily:"monospace"}}>{p.id}</div>
+                  </div>
+                  <span style={S.bdg(p.priority)}>{p.priority}</span>
+                </div>
+              ))}
+              {pts.length===0&&<div style={{color:C.sub,fontSize:13,textAlign:"center",padding:20}}>No patients — tap ➕ to add</div>}
+            </div>
+          </div>
+        )}
+
+        {view==="ward"&&(
+          <div>
+            <div style={{fontFamily:"Syne",fontSize:20,fontWeight:800,color:C.t,marginBottom:3}}>Ward Patients</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:14}}>{wardPts.length} patient(s)</div>
+            {wardPts.length===0
+              ?<div style={S.card({textAlign:"center",padding:56,color:C.sub})}><div style={{fontSize:44}}>🛏️</div><Sp h={12}/>No patients — tap ➕ to add</div>
+              :wardPts.map(p=><PatCard key={p.id} patient={p} onClick={setSel} onDel={delPt} protos={protos}/>)}
+          </div>
+        )}
+
+        {view==="references"&&(
+          <div>
+            <div style={{fontFamily:"Syne",fontSize:20,fontWeight:800,color:C.t,marginBottom:3}}>References</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:14}}>From other departments</div>
+            <div style={S.card({background:`${C.accent}08`,border:`1px solid ${C.accent}25`,marginBottom:14})}>
+              <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:8}}>📤 Shareable Link</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                <input style={{...S.inp,flex:1,minWidth:140,fontSize:11}} readOnly value={shareUrl}/>
+                <button onClick={()=>{navigator.clipboard?.writeText(shareUrl).then(()=>alert("✅ Copied!"));}} style={S.btn("p")}>Copy</button>
+                <button onClick={()=>window.open("https://wa.me/?text="+encodeURIComponent("GMC Plastic Surgery Reference Form:\n"+shareUrl),"_blank")} style={{...S.btn(),background:"#25D366"}}>📲</button>
+              </div>
+            </div>
+            {refPts.length===0
+              ?<div style={S.card({textAlign:"center",padding:40,color:C.sub})}><div style={{fontSize:36}}>📩</div><Sp h={10}/>No references yet</div>
+              :refPts.map(p=><PatCard key={p.id} patient={p} onClick={setSel} onDel={delPt} protos={protos}/>)}
+          </div>
+        )}
+
+        {view==="otqueue"&&(
+          <div>
+            <div style={{fontFamily:"Syne",fontSize:20,fontWeight:800,color:C.t,marginBottom:3}}>OT Queue</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:14}}>Emergency → Urgent → Semi-Urgent → Elective</div>
+            {qPts.length===0
+              ?<div style={S.card({textAlign:"center",padding:56,color:C.sub})}><div style={{fontSize:44}}>🏥</div><Sp h={12}/>No patients cleared for OT</div>
+              :[...qPts].sort((a,b)=>["Emergency","Urgent","Semi-Urgent","Elective"].indexOf(a.priority)-["Emergency","Urgent","Semi-Urgent","Elective"].indexOf(b.priority)).map((p,i)=>{
+                const pr=PRIO[p.priority];
+                return(
+                  <div key={p.id} onClick={()=>setSel(p)} style={S.card({borderLeft:`4px solid ${pr.c}`,cursor:"pointer"})} className="fu">
+                    <div style={{display:"flex",alignItems:"center",gap:12}}>
+                      <div style={{width:36,height:36,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:15,background:`${pr.c}18`,color:pr.c,flexShrink:0}}>{i+1}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:700,color:C.t,fontSize:14}}>{p.name} <span style={S.bdg(p.priority)}>{pr.i}</span></div>
+                        <div style={{fontSize:11,color:C.accent,fontFamily:"monospace"}}>{p.id}</div>
+                        <div style={{fontSize:12,color:C.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.diagnosis}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+
+        {view==="protocols"&&<ProtoManager protos={protos} onSave={saveProtos}/>}
+      </div>
+
+      {/* Modals */}
+      {showAdd&&<PatForm onSave={async p=>{await addPt(p);setShowAdd(false);setView("ward");}} onClose={()=>setShowAdd(false)} protos={protos}/>}
+      {sel&&<PatDetail patient={sel} onClose={()=>setSel(null)} onUpdate={async p=>{await updPt(p);setSel(p);}} protos={protos} user={user}/>}
+      {showLogbook&&<Logbook pts={pts} protos={protos} user={user} onClose={()=>setShowLogbook(false)}/>}
+      {showUserMgr&&<UserManager onClose={()=>setShowUserMgr(false)}/>}
+      {showPhotoDrive&&<PhotoDrive pts={pts} protos={protos} onClose={()=>setShowPhotoDrive(false)}/>}
+      {showOTList&&<OTListPanel pts={pts} protos={protos} user={user} onClose={()=>setShowOTList(false)}/>}
+    </div>
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
