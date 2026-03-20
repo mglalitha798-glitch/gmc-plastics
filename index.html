@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GMC Plastics PMS v4</title>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#060C18}
+body{color:#E2EAF4;font-family:'DM Sans',sans-serif;font-size:13px}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#0B1628}::-webkit-scrollbar-thumb{background:#1E3A5F;border-radius:3px}
+input,select,textarea,button{font-family:inherit}
+select option{background:#0A0F1E;color:#E2EAF4}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fi{animation:fadeIn 0.18s ease}
+.sp{animation:spin 0.7s linear infinite;display:inline-block;width:14px;height:14px;border:2px solid #1E3A5F;border-top-color:#3B82F6;border-radius:50%;vertical-align:middle}
+@media print{.noprint{display:none!important}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:14px"><div class="sp" style="width:36px;height:36px;border-width:3px"></div><div style="color:#5E7A9E">Loading GMC Plastics v4...</div></div></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+
+// ═══════════════════════════════════════════
+// SUPABASE — replace these two values
+// Get FREE at supabase.com (tap Setup Guide)
+// ═══════════════════════════════════════════
+const SURL='https://puwvywwysdbgyhcypocc.supabase.co';
+const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB1d3Z5d3d5c2RiZ3loY3lwb2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5OTkzNTAsImV4cCI6MjA4OTU3NTM1MH0.mcmpLm5sKZbzwPcHW_uWyjJCj_uyp3SlAXNoChXWft0';
+let SB=null;
+try{if(!SURL.includes('YOUR_'))SB=window.supabase.createClient(SURL,SKEY);}catch(e){}
+
+const LS={
+  g:(k,fb)=>{try{const d=localStorage.getItem(k);return d?JSON.parse(d):fb;}catch{return fb;}},
+  s:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+};
+
+// ═══════════════════════════════════════════
+// PROTOCOL DATABASE
+// ═══════════════════════════════════════════
+const DP={
+  "Facial Fracture - Panfacial":{color:"#EF5350",category:"Trauma",
+    investigations:["CBC with differential","BMP: RFT, LFT, Electrolytes","Coagulation: PT, INR, aPTT","Blood group & cross-match (2 PRBC)","HbsAg, Anti-HCV, HIV ELISA","ECG 12-lead","Chest X-Ray PA","HRCT Face: axial + coronal + 3D","CT Brain plain","Ophthalmology: VA & fundus","Neurosurgery consult if needed","Dental/Maxillofacial opinion"],
+    preop_checklist:["Consent with photographs obtained","2 PRBC cross-matched and arranged","Airway: anticipate difficult airway","Nasal packing if active epistaxis","Large bore IV x2","Foley catheter planned for OT","Head-end elevation 30°","Dexamethasone 8mg IV pre-op planned"],
+    preop_orders:["Inj. Ceftriaxone 1g IV stat","Inj. Dexamethasone 8mg IV","Inj. Ondansetron 4mg IV","Tab. Alprazolam 0.25mg HS (if anxious)","IV: 18G left forearm, NS at KVO","NBM from midnight","Catheterise in OT","Alert anaesthesia re: difficult airway"],
+    special_consent:["Blood transfusion consent","Facial nerve injury risk","Vision change / blindness risk (orbital)","Malocclusion / bite change risk","Hardware palpability or need for removal","Scar / keloid risk","Incomplete reduction, re-operation risk","Bone graft consent (iliac crest if needed)"],
+    materials:["Titanium micro plates 1.0mm system","Titanium mini plates 1.5mm system","Titanium mini plates 2.0mm system","Titanium mesh 0.4mm (orbital floor)","Screws: 4mm, 6mm, 8mm each system","Erich arch bars x2 sets","IMF screws 1.5mm x20","Sutures: 3-0 Vicryl, 4-0 Nylon, 5-0 PDS","Corneal shields bilateral","Throat pack","Power drill + bur set","Rowe's disimpaction forceps","Freer elevator, periosteal elevator","Bone hooks x4"],
+    intraop:["Power drill & bur set","Titanium plates & screws","Titanium mesh orbital floor","Arch bars + IMF screws","Bone hooks & periosteal elevators","Nerve stimulator","Loupes x2","Corneal shields","Throat pack"],
+    postop:["Inj. Ceftriaxone 1g IV BD x5d","Inj. Metronidazole 500mg IV TDS x5d","Inj. Dexamethasone 8mg IV OD x3d then taper","Inj. Tramadol 50mg IV SOS","Chlorhexidine mouthwash TDS","Soft diet x6 weeks","Ice packs 20min q2h x48h","Ophthal review D1 post-op","Suture removal D7-10"],
+    references:["Manson PN - Facial Fractures, Grabb & Smith 8th Ed","ATLS Primary & Secondary Survey","AO CMF Surgery Reference aosurgery.org","Kelley P - Paediatric Facial Fractures PRS 2019"]},
+  "STSG - Split Thickness Skin Graft":{color:"#42A5F5",category:"Reconstruction",
+    investigations:["CBC, BMP, Blood sugar fasting & PP","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Wound swab C/S","Blood group & cross-match","Albumin & Pre-albumin","HbA1c if diabetic"],
+    preop_checklist:["Wound bed: clean granulation present","C/S result reviewed","Albumin >3g/dL confirmed","FBS <180 mg/dL","Pre-op wound photos with scale","Donor site marked (ALT preferred)","Mesher available in OT","Compression bandage for donor planned"],
+    preop_orders:["Inj. Cefazolin 1g IV stat pre-op","Blood sugar check morning of surgery","Wound: clean with NS, moist dressing","Mark donor site (anterolateral thigh)","NBM from midnight","IV 18G, RL at 100ml/hr"],
+    special_consent:["Graft failure / partial take risk","Donor site scar and colour change","Hypertrophic scar / contracture risk","Re-grafting if take incomplete","Infection at recipient and donor","Compression garment 6 months required","Sensory loss at donor site"],
+    materials:["Humby knife / Watson knife","Dermatome blade 0.012-0.015 inch","Mesher + carrier (1:1.5 or 1:3)","Mineral oil for harvesting","Saline-soaked gauze","Stapler for graft fixation","4-0 Nylon tie-over sutures","Paraffin gauze Jelonet donor","Mepilex Ag / Aquacel Ag","NPWT/VAC if available","Adrenaline swabs 1:200,000"],
+    intraop:["Humby/Watson knife","Mesher + carrier","Mineral oil","Saline gauze","Stapler","4-0 Nylon tie-over","Paraffin gauze donor","Aquacel Ag"],
+    postop:["Bolster/NPWT immobilise x5-7d","Do NOT disturb tie-over until Day 5","Donor dressing change D10-14","Elevate limb if lower extremity","Antibiotics per C/S","Graft check D5: note % take","Compression garment from W3 x6m","Physio ROM from D7","Moisturiser to donor from D14"],
+    references:["Ratner D - Skin Grafting Dermatol Clin 1998","Rudolph R - Skin Grafts McCarthy Plastic Surgery Vol1","Chang LK - Modern Wound Management PRS 2016"]},
+  "FTSG - Full Thickness Skin Graft":{color:"#26C6DA",category:"Reconstruction",
+    investigations:["CBC, BMP, Blood sugar","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Wound swab C/S if indicated","Albumin level"],
+    preop_checklist:["Defect size measured, template made","Donor site selected, pinch test done","Recipient bed: vascularised, no infection","Pre-op photos taken","Consent: graft loss, donor scar"],
+    preop_orders:["Inj. Cefazolin 1g IV pre-op","Mark donor site","Foil/X-ray template of defect made","NBM from midnight","IV access, start RL"],
+    special_consent:["Graft failure/loss risk","Donor site linear scar","Colour mismatch graft vs surrounding skin","Contour irregularity risk","Re-grafting may be needed"],
+    materials:["Iris scissors curved x2","Skin hooks x4","Defatting scissors","4-0/5-0 Nylon inset sutures","Cotton wool bolster","Aluminium foil template","Saline-moist gauze"],
+    intraop:["Iris scissors","Skin hooks","Defatting scissors","Nylon 4-0/5-0","Cotton bolster","Template material"],
+    postop:["Bolster tie-over x7-10d","Suture removal D10-14","SPF50+ sun protection x6m","Scar management from 3 weeks"],
+    references:["Sclafani AP - FTSG eMedicine","Rudolph R - Full Thickness Grafts McCarthy Plastic Surgery"]},
+  "Rotation / Local Flap":{color:"#AB47BC",category:"Reconstruction",
+    investigations:["CBC, BMP, Blood sugar","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Wound swab C/S if infected","Doppler if perforator flap","Albumin level"],
+    preop_checklist:["Defect mapped and measured L×W×D","Flap design drawn with methylene blue","Pivot point identified and marked","Length:width ratio ≤3:1 (random)","Pre-op photos: defect + proposed flap","Consent: necrosis risk, donor scar","Tourniquet plan if extremity"],
+    preop_orders:["Mark flap design methylene blue pre-op","Inj. Cefazolin 1g IV pre-op","Tourniquet 250mmHg if extremity","NBM from midnight","IV access"],
+    special_consent:["Partial or complete flap necrosis","Donor site scar","Wound dehiscence risk","Skin graft may be needed if flap fails","Sensory change in flap area"],
+    materials:["No.15 blade x2","Skin hooks x4","Bipolar diathermy","Monopolar diathermy","3-0 Vicryl deep dermal","3-0/4-0 Nylon skin","Suction drain if large undermining","Doppler probe if perforator"],
+    intraop:["No.15 blade","Skin hooks","Bipolar + monopolar","3-0 Vicryl, 3-0/4-0 Nylon","Drain if needed","Doppler probe"],
+    postop:["Flap monitoring hourly x24h","No pressure on flap","Head 30° if face/neck","Limb elevation if extremity","Amoxicillin-Clav x5d","Suture removal D10-14"],
+    references:["Mathes SJ, Nahai F - Reconstructive Surgery","Hallock GG - Local Flaps PRS 2014"]},
+  "Post-Burn Contracture Release":{color:"#FF8F00",category:"Burns & Contracture",
+    investigations:["CBC, BMP, Blood sugar","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Blood group & cross-match","Doppler if vascular compromise","Wound swab C/S","Albumin","X-ray of joint (bony ankylosis screen)"],
+    preop_checklist:["Contracture grade I-IV documented","ROM of joint measured pre-op","Scar maturity assessed","Albumin >3g/dL","Pre-op physio stretching documented","CRITICAL: airway if neck contracture","Graft/flap decision made","Splint fabricated pre-op","Pre-op photos: full extent"],
+    preop_orders:["Inj. Cefazolin 1g IV pre-op","Tourniquet 250mmHg for limb cases","Splint in corrected position ready in OT","NBM from midnight","If neck: fibreoptic intubation planned","Mark release and donor site"],
+    special_consent:["Incomplete release, residual contracture","Graft failure, re-grafting risk","Donor site scar and morbidity","Recurrence especially paediatric","Long-term splinting 3-6 months","Serial casting or secondary procedures","Sensory changes in release area"],
+    materials:["Humby knife / dermatome","Mesher","Ruler + callipers for Z-plasty","Kirschner wires for joints","Thermoplastic splint material","Aquacel Ag / Mepilex Ag","Tie-over 4-0 Nylon","NPWT if available"],
+    intraop:["Dermatome","Mesher","Callipers + ruler","Splint ready","K-wires if needed","NPWT/VAC"],
+    postop:["Splint in corrected position x3-6w continuously","Physio ROM from D7 supervised","Compression garment at 3 weeks","Graft check D5-7","Silicone gel from 6 weeks","Pressure therapy x12-18m"],
+    references:["Wainwright DJ - Post-Burn Scar Management Clin Plast Surg 2009","Monstrey S - Reconstructive Surgery for Burns 2018"]},
+  "Burns - Acute Management":{color:"#FF5722",category:"Burns & Contracture",
+    investigations:["CBC with differential","BMP: electrolytes critical","ABG if inhalation injury","Coagulation profile","Blood group & cross-match","Urine myoglobin (electrical burns)","Foley catheter: hourly UO","CXR for inhalation screen","COHb if smoke inhalation","Bronchoscopy if inhalation suspected","Wound swab C/S Day 3-5"],
+    preop_checklist:["TBSA calculated (Rule of Nines/Lund-Browder)","Burn depth classified","Parkland formula started: 4ml/kg/%TBSA Hartmann's","50% in first 8h FROM TIME OF BURN","Airway secured: early intubation if face/neck","Tetanus prophylaxis given","Wound photos with timestamp","Escharotomy if circumferential","Warm OT >28°C, warm fluids","Target UO 0.5-1ml/kg/hr"],
+    preop_orders:["Two large bore IVs, Hartmann's per Parkland","Foley catheter, hourly UO chart","Inj. Morphine 0.1mg/kg IV titrated","Inj. Ondansetron 4mg IV","Inj. Tetanus toxoid IM","Warm OT environment","NGT if >20% TBSA","Wound: cling wrap cover for OT"],
+    special_consent:["TBSA and depth explained","Mortality risk (Baux score) explained","Infection and sepsis risk","Multiple surgeries likely","Scarring, contractures, long-term physio","Donor site scars from grafting","Blood transfusion consent","Psychological impact and rehab explained"],
+    materials:["Humby/Watson dermatome","Mesher 1:3 for large burns","Mepilex Ag / Aquacel Ag","Stapler","NPWT/VAC","Warm saline packs","Cell saver if >40% TBSA","4-0 Nylon tie-over"],
+    intraop:["Dermatome","Mesher","Silver dressings","Stapler","NPWT/VAC","Warm saline packs","Cell saver"],
+    postop:["Strict I/O: UO >0.5ml/kg/hr","Burns chart daily depth re-assessment","Wound dressing per protocol","Early enteral feeding within 6h","Physio from Day 1","Wound swab C/S every 48h"],
+    references:["ABA Guidelines 2023","Herndon DN - Total Burn Care 5th Ed","Jeschke MG - Burn Care NEJM 2020","Baxter CR - Parkland Formula Surg Clin NA 1978"]},
+  "Gynaecomastia Surgery":{color:"#26A69A",category:"Aesthetic & Body",
+    investigations:["CBC, BMP, LFT, RFT","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Hormones: Testosterone, Estradiol, LH, FSH, Prolactin, TSH","FNAC/Core biopsy if firm/suspicious","USG chest bilateral","Mammography if suspicious (>40y or unilateral)","Endocrinology clearance"],
+    preop_checklist:["Simon's grade I/IIa/IIb/III documented","Cause: idiopathic/drug-induced/pathological","Pre-op photos: AP, lateral, oblique","Approach: liposuction ± gland excision","Periareolar marking done","Compression vest arranged (size measured)","Consent: asymmetry, recurrence, nipple necrosis"],
+    preop_orders:["Inj. Cefazolin 1g IV pre-op","Tumescent: 500ml NS + 1mg Adr + 20ml 2% Xylocaine ready","Mark periareolar incision + liposuction area","Compression vest: bring to OT","NBM from midnight","IV access"],
+    special_consent:["Recurrence / incomplete resection","Nipple-areola necrosis (rare)","Asymmetry, may need secondary surgery","Seroma or haematoma","Contour irregularity","Nipple sensory change (hypo/hyper-sensitivity)","Dog-ear deformity if skin excision"],
+    materials:["Liposuction cannulas 3-4mm Mercedes tip","Tumescent infiltration cannula","Suction tubing + collection chamber","No.15 blade","Bipolar diathermy","Blake drain","3-0 Vicryl, 4-0 Monocryl","Compression vest (correct size)","Foam padding + elastic bandage"],
+    intraop:["Liposuction cannulas","Tumescent solution","No.15 blade","Bipolar","Suction drain","3-0 Vicryl, 4-0 Monocryl","Compression vest"],
+    postop:["Compression vest x6w (24h x3w, then nights)","Drain out when <30ml/24h","Diclofenac 75mg IM BD x2d then oral","Amox-Clav oral x5d","No strenuous activity x6w","Review: D2, D7, 1m, 3m, 6m"],
+    references:["Simon BE - Gynaecomastia Classification PRS 1973","Rohrich RJ - Gynaecomastia Algorithm PRS 2003"]},
+  "Breast Reduction":{color:"#EC407A",category:"Aesthetic & Body",
+    investigations:["CBC, BMP, Coagulation","HbsAg, Anti-HCV, HIV ELISA","Blood group & cross-match (1 unit)","Fasting & PP blood sugar","Mammography if >35y or family Hx","USG breast bilateral","Cardiac clearance if BMI >35"],
+    preop_checklist:["SN-nipple distance measured bilateral","Regnault ptosis grade documented","Technique: inferior pedicle / vertical / free nipple","Pre-op photos: AP, lateral, oblique (standing)","Blood arranged 1 PRBC","DVT: TED stockings + LMWH planned"],
+    preop_orders:["Inj. Cefazolin 1g IV pre-op","Inj. LMWH Enoxaparin 40mg SC pre-op","TED stockings pre-induction","Markings done patient standing","NBM from midnight","IV access x2"],
+    special_consent:["Nipple loss partial/complete (free nipple if large)","Asymmetry, secondary correction","T-junction wound breakdown (most common)","Permanent scars (inverted-T or vertical)","Lactation may be impaired","Nipple sensory change","DVT/PE risk","Revisional surgery possible"],
+    materials:["Wise/vertical pattern template","Marking callipers","Bipolar diathermy","3-0 Vicryl deep, 3-0 PDS dermal, 4-0 Monocryl","Blake drains bilateral","Surgical bra (correct size)","Steri-strips for T-junction"],
+    intraop:["Wise/vertical template","Callipers","Bipolar","3-0 Vicryl, 3-0 PDS, 4-0 Monocryl","Blake drains","Surgical bra"],
+    postop:["Surgical bra x6w","Drains out <30ml/day","LMWH x5d post-op","Amox-Clav x5d","Steri-strips at T-junction","Silicone gel from 3w","No underwire bra x3m"],
+    references:["Hall-Findlay EJ - Reduction Mammoplasty 2nd Ed","Lejour M - Vertical Mammoplasty PRS 1994","BAPRAS Guidelines 2022"]},
+  "Lower 1/3 Face - Free Flap":{color:"#7E57C2",category:"Oncoplastic",
+    investigations:["CBC, BMP, LFT, RFT","Coagulation","Blood group & cross-match (2 PRBC + 2 FFP)","HbsAg, Anti-HCV, HIV ELISA","Biopsy / HPE report","CECT Head & Neck","PET CT if malignancy","Chest CT metastasis","2D Echo","CTA or MRA neck vessels","Doppler: ALT perforators + Allen's test","Oncology MDT clearance","Speech & swallowing assessment","Albumin, Pre-albumin, BMI"],
+    preop_checklist:["MDT clearance documented","Recipient vessel mapping confirmed","Donor site marked (ALT/RFFF/PMMC)","Two-team briefed","ICU/HDU bed confirmed","Tracheostomy consent obtained","NG tube planned post-op","2 PRBC + 2 FFP cross-matched"],
+    preop_orders:["Admit HDU night before","IV x2 large bore + arterial line in OT","Cross-matched blood confirmed with blood bank","NG tube in OT after intubation","Inj. Ceftriaxone 1g + Metronidazole 500mg IV pre-op","Inj. LMWH pre-op","ICU bed confirmed"],
+    special_consent:["Flap failure requiring re-operation","Tracheostomy temporary or permanent","NG feeding 4-6 weeks","Fistula formation risk","Donor site morbidity (ALT: thigh; RFFF: forearm)","Total flap loss, need alternative reconstruction","Oncological recurrence","Long-term speech & swallowing rehab","Partial facial paralysis risk"],
+    materials:["Operating microscope (Zeiss/Leica)","Microsurgery set: Acland clamps, Castroviejo forceps, micro scissors","Anastomosis coupler 2.5-3mm","Intraop Doppler probe","Bipolar fine tip","Loupes x2","Sural nerve graft on standby","Vessel dilators","Heparinised saline","Prolene 8-0, 9-0"],
+    intraop:["Microsurgery set","Operating microscope","Anastomosis coupler","Intraop Doppler","Bipolar fine tip","Loupes x2","Prolene 8-0/9-0","Heparinised saline"],
+    postop:["ICU/HDU x48-72h","Hourly flap monitoring: colour, turgor, CRT, Doppler","Inj. Heparin 5000U SC BD","Tab. Aspirin 75mg OD","Ceftriaxone + Metronidazole x7d","NG feeding from 6h post-op","Head 30°, NO pressure on pedicle","Flap salvage: take-back within 72h if compromise"],
+    references:["Wei FC, Mardini S - Flaps & Reconstructive Surgery 2nd Ed","Urken ML - Head & Neck Reconstruction 3rd Ed","Chang EI - ALT Flap H&N PRS 2020"]},
+  "Cleft Lip - Primary Repair":{color:"#66BB6A",category:"Congenital",
+    investigations:["CBC, BMP","Blood group & cross-match","HbsAg, Anti-HCV, HIV ELISA","Weight and feeding assessment","ENT: URTI screening","Cardiac echo (congenital heart screen mandatory)","Hb ≥10g/dL confirmed"],
+    preop_checklist:["Rule of 10s: ≥10 weeks, ≥10lbs (4.5kg), Hb ≥10g/dL","No URTI in last 2 weeks","Cardiac clearance obtained","NAM if used: documented","Millard/Fisher markings + callipers","Pre-op photos: frontal, oblique, base","Consent: revisional surgery, asymmetry, nasal deformity","Arm splints prepared"],
+    preop_orders:["Paediatric IV 22G","IV fluids: DNS at maintenance","Inj. Ampicillin 25mg/kg IV pre-op","Arm splints: apply before extubation","No suckling post-op: cup/syringe feeding only","Warm OT environment","Paediatric anaesthesia briefed"],
+    special_consent:["Revisional surgery expected at adolescence","Permanent scar on lip (fades significantly)","Asymmetry lip/nose possible","Wound dehiscence if infant cries","Secondary nasal surgery at age 5-6 and 16-18","Orthodontic treatment required"],
+    materials:["Callipers + ruler","No.15 blade","Fine iris scissors curved","Skin hooks x4","4-0 Vicryl muscle","5-0 PDS deep dermal","6-0 Monocryl/Prolene skin","Logan's bow","Arm/elbow splints"],
+    intraop:["Callipers + ruler","No.15 blade","Iris scissors","Skin hooks","4-0 Vicryl, 5-0 PDS, 6-0 Monocryl","Logan's bow","Arm splints"],
+    postop:["Arm/elbow restraints x4w","Syringe/cup feeding (NO bottle nipple) x2w","Wound: saline + antibiotic ointment BD","Paracetamol suspension for analgesia","Review: D7, 1m, 3m, 1y"],
+    references:["Millard DR - Cleft Craft Vol 1","Fisher DM - Unilateral Cleft Lip PRS 2005","Mulliken JB - Bilateral Cleft Lip PRS 2004"]}
+};
+
+const PRIO={Emergency:{c:"#EF5350",i:"🚨"},Urgent:{c:"#FF7043",i:"⚡"},"Semi-Urgent":{c:"#FFA726",i:"🔶"},Elective:{c:"#66BB6A",i:"📋"}};
+const WARDS=["Ward 9A - Plastics Male","Ward 9B - Plastics Female","Ward 9C - Burns","ICU / HDU","PACU / Recovery","OPD / Outpatient","Emergency Dept."];
+const PROTO_CATS=["All","Trauma","Reconstruction","Oncoplastic","Vascular","Burns & Contracture","Aesthetic & Body","Congenital","Custom"];
+const C={bg:"#060C18",panel:"#0B1628",card:"#0F1E36",b:"#162847",accent:"#3B82F6",t:"#E2EAF4",sub:"#5E7A9E",mu:"#3B5278",ok:"#22C55E",warn:"#F59E0B",err:"#EF4444",teal:"#14B8A6"};
+
+// ═══════════════════════════════════════════
+// DATABASE LAYER
+// ═══════════════════════════════════════════
+const DB={
+  async getPts(){
+    if(SB){const{data,error}=await SB.from('patients').select('*').order('created_at',{ascending:false});if(!error&&data)return data.map(r=>r.data||r);}
+    return LS.g('gmc_pts_v5',[]);
+  },
+  async savePt(p){
+    if(SB){await SB.from('patients').upsert({id:p.id,data:p,created_at:p.created_at||new Date().toISOString()},{onConflict:'id'});}
+    const all=LS.g('gmc_pts_v5',[]);LS.s('gmc_pts_v5',[p,...all.filter(x=>x.id!==p.id)]);return p;
+  },
+  async delPt(id){
+    if(SB)await SB.from('patients').delete().eq('id',id);
+    LS.s('gmc_pts_v5',LS.g('gmc_pts_v5',[]).filter(p=>p.id!==id));
+  },
+  async getProtos(){
+    if(SB){const{data}=await SB.from('protocols').select('*');if(data&&data.length){const o={};data.forEach(r=>{o[r.name]=r.data;});return o;}}
+    return LS.g('gmc_protos_v5',DP);
+  },
+  async saveProtos(protos){
+    if(SB){const rows=Object.entries(protos).map(([name,data])=>({name,data}));await SB.from('protocols').upsert(rows,{onConflict:'name'});}
+    LS.s('gmc_protos_v5',protos);
+  },
+  async uploadPhoto(patId,tag,file){
+    if(SB){
+      const ext=file.name.split('.').pop();
+      const path=`${patId}/${tag}_${Date.now()}.${ext}`;
+      const{error}=await SB.storage.from('patient-photos').upload(path,file,{contentType:file.type});
+      if(!error){const{data:u}=SB.storage.from('patient-photos').getPublicUrl(path);return u.publicUrl;}
+    }
+    return new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(file);});
+  },
+  getChks:(pid)=>LS.g('chk_'+pid,{}), setChks:(pid,v)=>LS.s('chk_'+pid,v),
+  getPhotos:(pid)=>LS.g('pho_'+pid,{}), setPhotos:(pid,v)=>LS.s('pho_'+pid,v),
+  getOrders:(pid)=>LS.g('ord_'+pid,[]), setOrders:(pid,v)=>LS.s('ord_'+pid,v),
+  getDS:(pid)=>LS.g('ds_'+pid,{}), setDS:(pid,v)=>LS.s('ds_'+pid,v),
+};
+
+// ═══════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════
+const S={
+  card:{background:C.card,border:`1px solid ${C.b}`,borderRadius:12,padding:18,marginBottom:12},
+  inp:{background:C.bg,border:`1px solid ${C.b}`,borderRadius:8,padding:"8px 12px",color:C.t,fontSize:13,width:"100%",outline:"none"},
+  sel:{background:C.bg,border:`1px solid ${C.b}`,borderRadius:8,padding:"8px 12px",color:C.t,fontSize:13,width:"100%",outline:"none"},
+  ta:{background:C.bg,border:`1px solid ${C.b}`,borderRadius:8,padding:"8px 12px",color:C.t,fontSize:13,width:"100%",outline:"none",resize:"vertical"},
+  lbl:{fontSize:11,color:C.sub,marginBottom:4,display:"block",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.6px"},
+  btn:(v="p")=>({padding:v==="sm"?"3px 8px":"8px 14px",borderRadius:7,border:"none",cursor:"pointer",fontWeight:700,fontSize:v==="sm"?11:13,fontFamily:"inherit",
+    background:v==="p"?`linear-gradient(135deg,#1D4ED8,${C.accent})`:v==="g"?"#15803D":v==="r"?"#991B1B":v==="y"?"#92400E":v==="teal"?C.teal:C.card,color:"#fff"}),
+  bdg:(p)=>({display:"inline-flex",alignItems:"center",gap:3,padding:"2px 8px",borderRadius:20,fontSize:11,fontWeight:700,background:`${PRIO[p]?.c}18`,color:PRIO[p]?.c,border:`1px solid ${PRIO[p]?.c}30`}),
+  pil:(col)=>({display:"inline-flex",alignItems:"center",padding:"3px 9px",borderRadius:20,fontSize:11,fontWeight:600,background:`${col}18`,color:col,border:`1px solid ${col}30`}),
+  nav:(a)=>({display:"flex",alignItems:"center",gap:9,padding:"10px 18px",cursor:"pointer",borderLeft:a?`3px solid ${C.accent}`:"3px solid transparent",background:a?"rgba(59,130,246,0.08)":"transparent",color:a?C.accent:C.sub,fontSize:13,fontWeight:a?700:400}),
+  chkrow:(done)=>({display:"flex",alignItems:"flex-start",gap:10,padding:"8px 12px",borderRadius:8,marginBottom:4,background:done?"rgba(34,197,94,0.06)":"rgba(59,130,246,0.03)",border:`1px solid ${done?"#22C55E30":C.b}`,cursor:"pointer"}),
+  g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12},
+  g3:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12},
+  ovl:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.82)",zIndex:1000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"20px 12px",overflowY:"auto"},
+  box:(w=800)=>({background:C.panel,border:`1px solid ${C.b}`,borderRadius:16,padding:24,width:"100%",maxWidth:w,maxHeight:"none"}),
+  sh:{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:C.bg,borderRadius:10,marginBottom:8,cursor:"pointer",border:`1px solid ${C.b}`},
+  dv:{height:1,background:C.b,margin:"14px 0"},
+};
+const CB=({chk,on})=>(
+  <div onClick={on} style={{width:18,height:18,borderRadius:5,border:`2px solid ${chk?"#22C55E":C.mu}`,background:chk?"#22C55E":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1,cursor:"pointer"}}>
+    {chk&&<span style={{color:"#fff",fontSize:10,fontWeight:700}}>✓</span>}
+  </div>
+);
+const Sp=({h=10})=><div style={{height:h}}/>;
+const Lbl=({t})=><label style={S.lbl}>{t}</label>;
+
+// ═══════════════════════════════════════════
+// INVESTIGATION ROW + INLINE PHOTO UPLOAD
+// ═══════════════════════════════════════════
+function InvRow({item,idx,patId,checked,onChk,photos,onAddPhoto}){
+  const [exp,setExp]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const fRef=useRef(); const cRef=useRef();
+  const mine=photos['inv_'+idx]||[];
+
+  const handle=async file=>{
+    if(!file)return;
+    setBusy(true);
+    try{
+      const url=await DB.uploadPhoto(patId,'inv_'+idx,file);
+      onAddPhoto('inv_'+idx,{url,name:file.name,ts:Date.now()});
+    }catch(e){alert('Upload failed: '+e.message);}
+    setBusy(false);
+    setExp(true);
+  };
+
+  return(
+    <div style={{marginBottom:5}}>
+      <div style={S.chkrow(checked)} onClick={()=>onChk('inv_'+idx)}>
+        <CB chk={checked} on={()=>onChk('inv_'+idx)}/>
+        <span style={{flex:1,fontSize:13,color:checked?"#5E7A9E":C.t,textDecoration:checked?"line-through":"none"}}>{item}</span>
+        <div style={{display:"flex",gap:5,marginLeft:8}} onClick={e=>e.stopPropagation()}>
+          {mine.length>0&&<button onClick={()=>setExp(!exp)} style={{...S.btn("sm"),background:"rgba(59,130,246,0.18)",color:C.accent}}>📎{mine.length}</button>}
+          <button onClick={()=>fRef.current?.click()} style={{...S.btn("sm"),background:"rgba(59,130,246,0.1)",color:C.accent}} title="Upload report/image">
+            {busy?<span className="sp"/>:"📁"}
+          </button>
+          <button onClick={()=>cRef.current?.click()} style={{...S.btn("sm"),background:"rgba(20,184,166,0.1)",color:C.teal}} title="Take photo">📷</button>
+          <input ref={fRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={e=>{handle(e.target.files[0]);e.target.value="";}}/>
+          <input ref={cRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{handle(e.target.files[0]);e.target.value="";}}/>
+        </div>
+      </div>
+      {exp&&mine.length>0&&(
+        <div style={{marginLeft:28,marginBottom:6,display:"flex",flexWrap:"wrap",gap:8}}>
+          {mine.map((ph,pi)=>(
+            <div key={pi}>
+              {(ph.url.startsWith('data:image')||ph.url.startsWith('http'))
+                ?<img src={ph.url} alt={ph.name} style={{width:78,height:78,objectFit:"cover",borderRadius:8,border:`1px solid ${C.b}`,cursor:"pointer"}} onClick={()=>window.open(ph.url,'_blank')}/>
+                :<a href={ph.url} target="_blank" rel="noreferrer" style={{display:"flex",gap:5,alignItems:"center",padding:"5px 10px",background:C.card,borderRadius:8,border:`1px solid ${C.b}`,color:C.accent,fontSize:11,textDecoration:"none"}}>📄 {ph.name}</a>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// PROTOCOL PANEL (with all 8 sections)
+// ═══════════════════════════════════════════
+function ProtPanel({diagnosis,patId,protos}){
+  const proto=protos[diagnosis];
+  const [chks,setChks]=useState(()=>DB.getChks(patId));
+  const [photos,setPhotos]=useState(()=>DB.getPhotos(patId));
+  const [open,setOpen]=useState("investigations");
+
+  useEffect(()=>DB.setChks(patId,chks),[chks,patId]);
+  useEffect(()=>DB.setPhotos(patId,photos),[photos,patId]);
+
+  if(!proto) return(
+    <div style={{...S.card,textAlign:"center",padding:48,color:C.sub}}>
+      <div style={{fontSize:36}}>🔬</div><Sp/>
+      <div>No protocol for this diagnosis. Add one via Protocol Manager.</div>
+    </div>
+  );
+
+  const tog=(key)=>setChks(p=>({...p,[key]:!p[key]}));
+  const addPhoto=(key,ph)=>setPhotos(p=>({...p,[key]:[...(p[key]||[]),ph]}));
+  const allInvDone=(proto.investigations||[]).every((_,i)=>chks['inv_'+i]);
+
+  const Sec=({k,icon,title,items,isInv})=>{
+    const done=(items||[]).filter((_,i)=>chks[`${k}_${i}`]||chks[`inv_${i}`]).length;
+    const total=(items||[]).length;
+    const isOpen=open===k;
+    return(
+      <div style={{marginBottom:10}}>
+        <div style={S.sh} onClick={()=>setOpen(isOpen?null:k)}>
+          <span style={{fontSize:16}}>{icon}</span>
+          <span style={{fontWeight:700,color:C.t,flex:1}}>{title}</span>
+          {total>0&&<span style={{fontSize:11,color:done===total&&total>0?"#22C55E":C.sub,fontWeight:600}}>{isInv?`${(proto.investigations||[]).filter((_,i)=>chks['inv_'+i]).length}/${total}`:''}</span>}
+          <span style={{color:C.mu,marginLeft:8,fontSize:12}}>{isOpen?"▲":"▼"}</span>
+        </div>
+        {isOpen&&(items||[]).map((item,i)=>{
+          const key=isInv?'inv_'+i:`${k}_${i}`;
+          return isInv
+            ?<InvRow key={i} item={item} idx={i} patId={patId} checked={!!chks['inv_'+i]} onChk={tog} photos={photos} onAddPhoto={addPhoto}/>
+            :<div key={i} style={S.chkrow(!!chks[key])} onClick={()=>tog(key)}>
+              <CB chk={!!chks[key]} on={()=>tog(key)}/>
+              <span style={{fontSize:13,color:chks[key]?"#5E7A9E":C.t,textDecoration:chks[key]?"line-through":"none"}}>{item}</span>
+            </div>;
+        })}
+      </div>
+    );
+  };
+
+  return(
+    <div>
+      <div style={{...S.card,background:`linear-gradient(135deg,${proto.color}12,${C.card})`,borderLeft:`4px solid ${proto.color}`,marginBottom:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div>
+            <div style={{fontSize:11,color:proto.color,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:4}}>🤖 Protocol Auto-Loaded</div>
+            <div style={{fontSize:16,fontWeight:800,color:C.t}}>{diagnosis}</div>
+            <div style={{fontSize:12,color:C.sub,marginTop:3}}>GMC — Dept. of Plastic & Reconstructive Surgery</div>
+          </div>
+          <span style={{padding:"2px 9px",borderRadius:4,fontSize:11,fontWeight:600,background:`${proto.color}18`,color:proto.color,border:`1px solid ${proto.color}25`}}>{proto.category}</span>
+        </div>
+        {allInvDone&&<div style={{marginTop:10,padding:"6px 12px",background:"rgba(34,197,94,0.1)",borderRadius:8,color:"#22C55E",fontSize:12,fontWeight:600}}>✅ All investigations checked — patient may be added to OT queue</div>}
+      </div>
+      <Sec k="investigations" icon="🧪" title="Pre-Op Investigations" items={proto.investigations} isInv={true}/>
+      <Sec k="preop" icon="✅" title="Pre-Op Checklist (PAC)" items={proto.preop_checklist}/>
+      <Sec k="preop_orders" icon="📝" title="Pre-Op Orders" items={proto.preop_orders}/>
+      <Sec k="special_consent" icon="⚖️" title="Special Consent" items={proto.special_consent}/>
+      <Sec k="materials" icon="🛒" title="Materials & Equipment" items={proto.materials}/>
+      <Sec k="intraop" icon="🔪" title="Intra-Op Requirements" items={proto.intraop}/>
+      <Sec k="postop" icon="💊" title="Post-Op Orders" items={proto.postop}/>
+      <Sec k="references" icon="📚" title="Key References" items={proto.references}/>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// DISCHARGE SUMMARY — complete sections
+// ═══════════════════════════════════════════
+function DischargeSummary({patient,proto}){
+  const [ds,setDs]=useState(()=>DB.getDS(patient.id));
+  const upd=(k,v)=>setDs(p=>({...p,[k]:v}));
+  useEffect(()=>DB.setDS(patient.id,ds),[ds,patient.id]);
+
+  const F=({label,k,rows=3,hint=""})=>(
+    <div style={{marginBottom:14}}>
+      <Lbl t={label}/>
+      <textarea style={{...S.ta,minHeight:rows*28}} value={ds[k]||""} onChange={e=>upd(k,e.target.value)} placeholder={hint||`Enter ${label.toLowerCase()}...`}/>
+    </div>
+  );
+
+  const doPrint=()=>{
+    const w=window.open('','_blank');
+    const autoPostop=(proto?.postop||[]).slice(0,6).join('\n');
+    w.document.write(`<!DOCTYPE html><html><head><title>Discharge Summary - ${patient.name}</title>
+<style>
+  body{font-family:Arial,sans-serif;font-size:10.5pt;color:#111;margin:15mm 20mm}
+  h1{font-size:14pt;text-align:center;color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:6px}
+  h2{font-size:10.5pt;color:#1B3A6B;margin:12px 0 3px;border-bottom:1px solid #bcd;padding-bottom:2px}
+  .g{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px}
+  .f{background:#f5f7ff;padding:4px 8px;border-radius:3px;border:1px solid #dde}
+  .fl{font-size:8pt;color:#777;font-weight:bold;text-transform:uppercase}
+  .fv{font-size:10pt;margin-top:1px}
+  .sec{padding:5px 10px;border-left:3px solid #1B3A6B;background:#f9faff;white-space:pre-wrap;margin-bottom:6px;font-size:10pt}
+  .sig{display:flex;justify-content:space-between;margin-top:32px}
+  .sig div{text-align:center;border-top:1px solid #555;padding-top:3px;width:160px;font-size:9pt}
+  .ft{text-align:right;font-size:8pt;color:#888;margin-top:16px}
+</style></head><body>
+<h1>GRANT MEDICAL COLLEGE & HOSPITAL, MUMBAI<br/>
+<span style="font-size:10.5pt">Department of Plastic &amp; Reconstructive Surgery</span><br/>
+<span style="font-size:9.5pt;color:#555">DISCHARGE SUMMARY</span></h1>
+<div class="g">
+${[["Patient Name",patient.name],["IPD No.",patient.id],["Age / Gender",`${patient.age}y / ${patient.gender}`],["Ward",patient.ward],["Date of Admission",patient.admitDate],["Date of Discharge",new Date().toLocaleDateString('en-IN')],["Diagnosis",patient.diagnosis],["Resident / Consultant",`Dr. ${patient.resident}`]]
+.map(([k,v])=>`<div class="f"><div class="fl">${k}</div><div class="fv">${v||'—'}</div></div>`).join('')}
+</div>
+${ds.chiefComplaint?`<h2>Chief Complaint</h2><div class="sec">${ds.chiefComplaint}</div>`:''}
+${ds.history?`<h2>History of Present Illness</h2><div class="sec">${ds.history}</div>`:''}
+${ds.pastHistory?`<h2>Past History / Co-morbidities / Regular Medications</h2><div class="sec">${ds.pastHistory}</div>`:''}
+${ds.examination?`<h2>Examination Findings (On Admission)</h2><div class="sec">${ds.examination}</div>`:''}
+${ds.investigations?`<h2>Investigations</h2><div class="sec">${ds.investigations}</div>`:''}
+${ds.treatment?`<h2>Treatment Given</h2><div class="sec">${ds.treatment}</div>`:''}
+${ds.procedure?`<h2>Procedure / Operation Details</h2><div class="sec">${ds.procedure}</div>`:''}
+${ds.course?`<h2>Course in Hospital</h2><div class="sec">${ds.course}</div>`:''}
+<h2>Advice on Discharge</h2>
+<div class="sec">${autoPostop}${ds.extraAdvice?'\n\nAdditional:\n'+ds.extraAdvice:''}</div>
+${ds.medications?`<div class="sec"><strong>Medications on Discharge:</strong>\n${ds.medications}</div>`:''}
+${ds.diet?`<div class="sec"><strong>Diet:</strong> ${ds.diet}</div>`:''}
+${ds.activity?`<div class="sec"><strong>Activity Restrictions:</strong> ${ds.activity}</div>`:''}
+<h2>Follow-Up</h2>
+<div class="sec">${ds.followupDate?'Review date: '+ds.followupDate+'\n':''}${ds.followup||'Review at Plastic Surgery OPD. Return immediately if fever, wound opening, swelling or any concern.'}</div>
+${ds.emergency?`<div class="sec"><strong>Emergency Contact:</strong> ${ds.emergency}</div>`:''}
+<div class="sig">
+  <div>Patient / Attender<br/>Signature &amp; Date</div>
+  <div>Dr. ${patient.resident}<br/>Resident Surgeon</div>
+  <div>Consultant<br/>Signature &amp; Seal</div>
+</div>
+<div class="ft">Generated: ${new Date().toLocaleString('en-IN')} · GMC Plastics PMS v4</div>
+</body></html>`);
+    w.document.close();w.focus();w.print();
+  };
+
+  return(
+    <div>
+      {/* Header card */}
+      <div style={{...S.card,background:`linear-gradient(135deg,#1B3A6B14,${C.card})`,borderTop:`3px solid ${C.accent}`,marginBottom:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div>
+            <div style={{fontSize:14,fontWeight:800,color:C.t}}>📄 Discharge Summary</div>
+            <div style={{fontSize:11,color:C.sub,marginTop:2}}>Fill sections below → Print generates a formatted hospital document</div>
+          </div>
+          <button onClick={doPrint} style={S.btn("g")}>🖨️ Print / Save PDF</button>
+        </div>
+        <div style={S.g2}>
+          {[["Patient",patient.name],["IPD No.",patient.id],["Age / Gender",`${patient.age}y / ${patient.gender}`],["Ward",patient.ward],["Admitted",patient.admitDate],["Diagnosis",patient.diagnosis],["Resident",`Dr. ${patient.resident}`],["Discharge Date",new Date().toLocaleDateString('en-IN')]]
+          .map(([k,v])=>(
+            <div key={k} style={{padding:"6px 10px",background:C.bg,borderRadius:8,border:`1px solid ${C.b}`}}>
+              <div style={{fontSize:10,color:C.sub,textTransform:"uppercase"}}>{k}</div>
+              <div style={{fontSize:12,color:C.t,fontWeight:600,marginTop:1}}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Section 1 — History */}
+      <div style={S.card}>
+        <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:12,textTransform:"uppercase"}}>📋 Clinical History</div>
+        <F label="Chief Complaint" k="chiefComplaint" rows={2} hint="e.g. RTA with facial injuries, 3 days ago"/>
+        <F label="History of Present Illness" k="history" rows={4} hint="Onset, duration, mechanism, progression, treatment given before admission..."/>
+        <F label="Past History / Co-morbidities / Regular Medications" k="pastHistory" rows={3} hint="DM, HTN, prior surgeries, allergies, current medications..."/>
+      </div>
+
+      {/* Section 2 — Examination */}
+      <div style={S.card}>
+        <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:12,textTransform:"uppercase"}}>🩺 Examination Findings (On Admission)</div>
+        <F label="General Examination" k="genExam" rows={3} hint="Vitals, GCS, built, nourishment, pallor, icterus, cyanosis..."/>
+        <F label="Local / Systemic Examination" k="examination" rows={4} hint="Detailed local findings, wound description, nerve/vessel status..."/>
+      </div>
+
+      {/* Section 3 — Investigations */}
+      <div style={S.card}>
+        <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:12,textTransform:"uppercase"}}>🧪 Investigations</div>
+        <F label="Key Investigation Results" k="investigations" rows={6} hint="CBC: Hb ___ WBC ___ Plt ___&#10;RFT: Urea ___ Creatinine ___&#10;Blood sugar: ___&#10;Coagulation: PT ___ INR ___&#10;Imaging findings: ..."/>
+      </div>
+
+      {/* Section 4 — Treatment & Course */}
+      <div style={S.card}>
+        <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:12,textTransform:"uppercase"}}>💊 Treatment Given</div>
+        <F label="Treatment Given (Medications, IV Fluids, Transfusions)" k="treatment" rows={4} hint="IV antibiotics, analgesics, blood transfusion, dressings..."/>
+        <F label="Procedure / Operation Details" k="procedure" rows={4} hint="Date: ___&#10;Procedure: ___&#10;Anaesthesia: GA/LA/SA&#10;Surgeon: ___&#10;Intraop findings: ___&#10;Implants used: ..."/>
+        <div style={{...S.card,background:C.bg,padding:"10px 14px",marginBottom:14}}>
+          <div style={{fontSize:11,color:C.sub,marginBottom:6}}>📋 Protocol Post-Op Orders (auto-included in print):</div>
+          {(proto?.postop||[]).slice(0,6).map((item,i)=><div key={i} style={{fontSize:11,color:C.t,padding:"2px 0",borderBottom:`1px solid ${C.b}`}}>{i+1}. {item}</div>)}
+        </div>
+        <F label="Course in Hospital (Post-op progress, wound status, complications)" k="course" rows={4} hint="D1: vitals stable, flap pink...&#10;D2: drain output reduced...&#10;D5: wound healthy, graft take good..."/>
+      </div>
+
+      {/* Section 5 — Advice on Discharge */}
+      <div style={S.card}>
+        <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:12,textTransform:"uppercase"}}>🏠 Advice on Discharge</div>
+        <F label="Additional Medications on Discharge (drug, dose, frequency, duration)" k="medications" rows={4} hint="1. Tab. Amoxicillin-Clav 625mg BD x5d&#10;2. Tab. Diclofenac 50mg SOS&#10;3. Tab. Pantoprazole 40mg OD..."/>
+        <F label="Additional Advice / Wound Care Instructions" k="extraAdvice" rows={3}/>
+        <F label="Diet Advice" k="diet" rows={2} hint="e.g. Soft diet x4 weeks, high protein diet..."/>
+        <F label="Activity Restrictions" k="activity" rows={2} hint="e.g. No strenuous activity x6 weeks, avoid direct sunlight on wound..."/>
+        <div style={S.g2}>
+          <div>
+            <Lbl t="Follow-Up Date"/>
+            <input type="date" style={S.inp} value={ds.followupDate||""} onChange={e=>upd("followupDate",e.target.value)}/>
+          </div>
+          <div>
+            <Lbl t="Emergency Contact / Ward No."/>
+            <input style={S.inp} value={ds.emergency||""} onChange={e=>upd("emergency",e.target.value)} placeholder="Ward phone / resident mobile"/>
+          </div>
+        </div>
+        <Sp h={10}/>
+        <F label="Follow-Up Instructions" k="followup" rows={2} hint="Review at Plastics OPD with dressings. Return immediately if fever, wound opening..."/>
+      </div>
+
+      <div style={{display:"flex",gap:10}}>
+        <button onClick={doPrint} style={S.btn("g")}>🖨️ Print Discharge Summary</button>
+        <button onClick={()=>{DB.setDS(patient.id,ds);alert("Draft saved!");}} style={S.btn("p")}>💾 Save Draft</button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// PATIENT DETAIL MODAL
+// ═══════════════════════════════════════════
+function PatDetail({patient,onClose,onUpdate,protos}){
+  const [tab,setTab]=useState("protocol");
+  const [orders,setOrders]=useState(()=>DB.getOrders(patient.id));
+  const [otxt,setOtxt]=useState(""); const [oby,setOby]=useState("Resident");
+  const [editing,setEditing]=useState(false);
+  const [inQ,setInQ]=useState(()=>LS.g('q_'+patient.id,false));
+  const proto=protos[patient.diagnosis];
+
+  useEffect(()=>DB.setOrders(patient.id,orders),[orders,patient.id]);
+  useEffect(()=>LS.s('q_'+patient.id,inQ),[inQ]);
+
+  const addOrder=()=>{
+    if(!otxt.trim())return;
+    setOrders(p=>[...p,{id:Date.now(),text:otxt.trim(),by:oby,time:new Date().toLocaleString('en-IN'),type:(oby.includes("Senior")||oby.includes("Consultant"))?"senior":"res"}]);
+    setOtxt("");
+  };
+
+  const pr=PRIO[patient.priority];
+  const TABS=[{id:"protocol",l:"📋 Protocol"},{id:"orders",l:`📝 Orders (${orders.length})`},{id:"discharge",l:"🏥 Discharge"}];
+
+  return(
+    <>
+    {editing&&<PatForm existing={patient} onSave={p=>{onUpdate(p);setEditing(false);}} onClose={()=>setEditing(false)} protos={protos}/>}
+    <div style={S.ovl}>
+      <div style={{...S.box(980),maxHeight:"none"}} className="fi">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <span style={{fontSize:18,fontWeight:800,color:C.t}}>{patient.name}</span>
+              <span style={S.bdg(patient.priority)}>{pr.i} {patient.priority}</span>
+              <span style={S.pil(patient.status==="Cleared for OT"?"#22C55E":patient.status==="Post-Op"?"#3B82F6":C.warn)}>{patient.status}</span>
+            </div>
+            <div style={{fontSize:11,color:C.sub,marginTop:3}}>{patient.id} · {patient.age}y/{patient.gender} · {patient.ward}</div>
+            <div style={{fontSize:13,color:proto?.color||C.accent,fontWeight:600,marginTop:2}}>{patient.diagnosis}</div>
+          </div>
+          <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+            {patient.allInvestigationsDone&&!inQ&&<button onClick={()=>setInQ(true)} style={S.btn("g")}>➕ OT Queue</button>}
+            {inQ&&<span style={S.pil("#22C55E")}>✓ In OT Queue</span>}
+            <button onClick={()=>setEditing(true)} style={S.btn("y")}>✏️ Edit</button>
+            <button onClick={onClose} style={S.btn()}>✕ Close</button>
+          </div>
+        </div>
+        {patient.notes&&<div style={{padding:"6px 12px",background:C.bg,borderRadius:8,border:`1px solid ${C.b}`,marginBottom:12,fontSize:12,color:C.sub}}>📝 {patient.notes}</div>}
+        <div style={{display:"flex",gap:4,marginBottom:14,borderBottom:`1px solid ${C.b}`,paddingBottom:8,flexWrap:"wrap"}}>
+          {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",background:tab===t.id?"#1D4ED8":"transparent",color:tab===t.id?"#fff":C.sub,fontSize:12,fontWeight:600,fontFamily:"inherit"}}>{t.l}</button>)}
+        </div>
+        {tab==="protocol"&&<ProtPanel diagnosis={patient.diagnosis} patId={patient.id} protos={protos}/>}
+        {tab==="orders"&&(
+          <div>
+            <div style={S.card}>
+              <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:10,textTransform:"uppercase"}}>Add Order / Note</div>
+              <Lbl t="Order By"/>
+              <select style={{...S.sel,marginBottom:8}} value={oby} onChange={e=>setOby(e.target.value)}>
+                <option>Resident</option><option>Senior/Consultant</option><option>Anaesthesia</option><option>Allied Dept</option><option>Nursing</option>
+              </select>
+              <textarea style={S.ta} value={otxt} onChange={e=>setOtxt(e.target.value)} placeholder="Write order or clinical note..."/>
+              <button onClick={addOrder} style={{...S.btn("p"),marginTop:8}}>Add Order</button>
+            </div>
+            {orders.length===0?<div style={{...S.card,textAlign:"center",padding:28,color:C.sub}}>No orders yet</div>
+              :[...orders].reverse().map(o=>(
+              <div key={o.id} style={{...S.card,borderLeft:`3px solid ${o.type==="senior"?"#F59E0B":C.accent}`}}>
+                <div style={{fontSize:10,color:C.sub,marginBottom:4}}>{o.type==="senior"?"👨‍⚕️":"💊"} {o.by} · {o.time}</div>
+                <div style={{fontSize:13,color:C.t}}>{o.text}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {tab==="discharge"&&<DischargeSummary patient={patient} proto={proto}/>}
+      </div>
+    </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════
+// PATIENT FORM
+// ═══════════════════════════════════════════
+function PatForm({existing,onSave,onClose,protos}){
+  const [f,setF]=useState(existing||{name:"",age:"",gender:"Male",ward:WARDS[0],diagnosis:Object.keys(protos)[0],priority:"Urgent",resident:"",contact:"",refType:"Ward",notes:"",status:"Pre-Op Workup",allInvestigationsDone:false});
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+  const save=()=>{
+    if(!f.name.trim())return alert("Patient name is required");
+    const id=existing?.id||`GMC-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}`;
+    onSave({...f,id,created_at:existing?.created_at||new Date().toISOString(),admitDate:existing?.admitDate||new Date().toISOString().split("T")[0]});
+  };
+  return(
+    <div style={S.ovl}>
+      <div style={S.box(800)} className="fi">
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:18}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:C.t}}>{existing?"Edit Patient":"Add New Patient"}</div>
+            <div style={{fontSize:12,color:C.sub,marginTop:2}}>Protocol auto-loads from selected diagnosis</div>
+          </div>
+          <button onClick={onClose} style={S.btn()}>✕</button>
+        </div>
+        <div style={S.g2}>
+          <div><Lbl t="Full Name *"/><input style={S.inp} value={f.name} onChange={e=>u("name",e.target.value)} placeholder="Patient full name"/></div>
+          <div><Lbl t="Age"/><input style={S.inp} type="number" value={f.age} onChange={e=>u("age",e.target.value)}/></div>
+          <div><Lbl t="Gender"/><select style={S.sel} value={f.gender} onChange={e=>u("gender",e.target.value)}><option>Male</option><option>Female</option><option>Other</option></select></div>
+          <div><Lbl t="Contact"/><input style={S.inp} value={f.contact} onChange={e=>u("contact",e.target.value)} placeholder="10-digit mobile"/></div>
+          <div><Lbl t="Ward"/><select style={S.sel} value={f.ward} onChange={e=>u("ward",e.target.value)}>{WARDS.map(w=><option key={w}>{w}</option>)}</select></div>
+          <div><Lbl t="Priority"/><select style={S.sel} value={f.priority} onChange={e=>u("priority",e.target.value)}>{Object.keys(PRIO).map(p=><option key={p}>{p}</option>)}</select></div>
+          <div><Lbl t="Patient Type"/><select style={S.sel} value={f.refType} onChange={e=>u("refType",e.target.value)}><option value="Ward">Own Ward Patient</option><option value="Reference">Inter-Dept Reference</option><option value="OPD">OPD / Outpatient</option></select></div>
+          <div><Lbl t="Resident"/><input style={S.inp} value={f.resident} onChange={e=>u("resident",e.target.value)} placeholder="Dr. Mehta"/></div>
+          <div style={{gridColumn:"1/-1"}}><Lbl t="Diagnosis (Protocol Auto-Loads)"/>
+            <select style={S.sel} value={f.diagnosis} onChange={e=>u("diagnosis",e.target.value)}>{Object.keys(protos).map(d=><option key={d}>{d}</option>)}</select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}><Lbl t="Status"/>
+            <select style={S.sel} value={f.status} onChange={e=>u("status",e.target.value)}>{["Pre-Op Workup","Active Management","Cleared for OT","Post-Op","Discharged"].map(s=><option key={s}>{s}</option>)}</select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}><Lbl t="Clinical Notes"/>
+            <textarea style={S.ta} value={f.notes} onChange={e=>u("notes",e.target.value)} placeholder="Mechanism of injury, clinical description, relevant history..."/>
+          </div>
+          <div style={{gridColumn:"1/-1",display:"flex",alignItems:"center",gap:10}}>
+            <CB chk={f.allInvestigationsDone} on={()=>u("allInvestigationsDone",!f.allInvestigationsDone)}/>
+            <span style={{fontSize:13,color:C.t}}>All investigations done — add to OT queue</span>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:16}}>
+          <button onClick={onClose} style={S.btn()}>Cancel</button>
+          <button onClick={save} style={S.btn("g")}>💾 {existing?"Update Patient":"Add Patient"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// REFERENCE FORM — PUBLIC (other depts)
+// This is shown when URL has #refer hash
+// ═══════════════════════════════════════════
+function RefForm({protos,onSubmit,onBack}){
+  const [f,setF]=useState({name:"",age:"",gender:"Male",ward:"",contact:"",diagnosis:Object.keys(protos)[0],priority:"Semi-Urgent",notes:"",refDept:"",refDoctorName:"",refType:"Reference"});
+  const [done,setDone]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const submit=async()=>{
+    if(!f.name.trim())return alert("Patient name is required");
+    if(!f.refDept.trim())return alert("Referring department is required");
+    setBusy(true);
+    const id=`REF-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}`;
+    await onSubmit({...f,id,created_at:new Date().toISOString(),admitDate:new Date().toISOString().split("T")[0],status:"Pre-Op Workup",allInvestigationsDone:false,resident:"",referenceId:id});
+    setBusy(false);
+    setDone(true);
+  };
+
+  if(done) return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div style={{...S.card,maxWidth:460,textAlign:"center",padding:44}}>
+        <div style={{fontSize:52,marginBottom:14}}>✅</div>
+        <div style={{fontSize:18,fontWeight:800,color:"#22C55E",marginBottom:8}}>Reference Submitted!</div>
+        <div style={{fontSize:13,color:C.sub,lineHeight:1.6}}>The Plastics team has received your referral for <strong style={{color:C.t}}>{f.name}</strong>. They will review and contact you shortly.</div>
+        <Sp h={18}/>
+        <button onClick={()=>setDone(false)} style={{...S.btn("p"),width:"100%"}}>Submit Another</button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,padding:"24px 16px"}}>
+      <div style={{maxWidth:640,margin:"0 auto"}}>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:12,padding:"14px 22px",background:C.panel,borderRadius:14,border:`1px solid ${C.b}`,marginBottom:14}}>
+            <span style={{fontSize:28}}>🏥</span>
+            <div>
+              <div style={{fontSize:16,fontWeight:800,color:C.t}}>GMC Plastic Surgery</div>
+              <div style={{fontSize:12,color:C.sub}}>Inter-Department Reference Form</div>
+            </div>
+          </div>
+          <div style={{fontSize:12,color:C.sub}}>Grant Medical College & Hospital, Mumbai<br/>Dept. of Plastic & Reconstructive Surgery</div>
+        </div>
+
+        <div style={S.card}>
+          <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:14,textTransform:"uppercase"}}>Referring Department Details</div>
+          <div style={S.g2}>
+            <div><Lbl t="Referring Department *"/><input style={S.inp} value={f.refDept} onChange={e=>u("refDept",e.target.value)} placeholder="e.g. ENT, Orthopaedics, Medicine, Neurosurgery"/></div>
+            <div><Lbl t="Referring Doctor's Name *"/><input style={S.inp} value={f.refDoctorName} onChange={e=>u("refDoctorName",e.target.value)} placeholder="Dr. Sharma"/></div>
+          </div>
+        </div>
+
+        <div style={S.card}>
+          <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:14,textTransform:"uppercase"}}>Patient Details</div>
+          <div style={S.g2}>
+            <div><Lbl t="Patient Full Name *"/><input style={S.inp} value={f.name} onChange={e=>u("name",e.target.value)}/></div>
+            <div><Lbl t="Age"/><input style={S.inp} type="number" value={f.age} onChange={e=>u("age",e.target.value)}/></div>
+            <div><Lbl t="Gender"/><select style={S.sel} value={f.gender} onChange={e=>u("gender",e.target.value)}><option>Male</option><option>Female</option><option>Other</option></select></div>
+            <div><Lbl t="Contact Number"/><input style={S.inp} value={f.contact} onChange={e=>u("contact",e.target.value)}/></div>
+            <div><Lbl t="Current Ward / Bed No."/><input style={S.inp} value={f.ward} onChange={e=>u("ward",e.target.value)} placeholder="Ward 5B Bed 12"/></div>
+            <div><Lbl t="Priority"/>
+              <select style={S.sel} value={f.priority} onChange={e=>u("priority",e.target.value)}>{Object.keys(PRIO).map(p=><option key={p}>{p}</option>)}</select>
+            </div>
+            <div style={{gridColumn:"1/-1"}}><Lbl t="Reason for Referral / Suspected Diagnosis"/>
+              <select style={S.sel} value={f.diagnosis} onChange={e=>u("diagnosis",e.target.value)}>{Object.keys(protos).map(d=><option key={d}>{d}</option>)}</select>
+            </div>
+            <div style={{gridColumn:"1/-1"}}><Lbl t="Clinical Notes / Reason for Reference"/>
+              <textarea style={{...S.ta,minHeight:96}} value={f.notes} onChange={e=>u("notes",e.target.value)} placeholder="Brief clinical details, what plastic surgery opinion or procedure is required, urgency, relevant history..."/>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={submit} disabled={busy} style={{...S.btn("g"),width:"100%",padding:"13px",fontSize:14}}>
+          {busy?<span className="sp"/>:"📤"} Submit Reference to Plastics Team
+        </button>
+        <Sp h={12}/>
+        {onBack&&<button onClick={onBack} style={{...S.btn(),width:"100%",fontSize:13}}>← Back to Dashboard</button>}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// PROTOCOL MANAGER
+// ═══════════════════════════════════════════
+function ProtoManager({protos,onSave}){
+  const [cat,setCat]=useState("All");
+  const [editing,setEditing]=useState(null);
+  const [showNew,setShowNew]=useState(false);
+
+  const SectionEditor=({proto,setProto,k,label,icon})=>{
+    const [txt,setTxt]=useState("");
+    const items=proto[k]||[];
+    const add=()=>{if(!txt.trim())return;setProto(p=>({...p,[k]:[...(p[k]||[]),txt.trim()]}));setTxt("");};
+    const rm=i=>setProto(p=>({...p,[k]:items.filter((_,j)=>j!==i)}));
+    return(
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:11,fontWeight:700,color:C.accent,marginBottom:6,textTransform:"uppercase"}}>{icon} {label}</div>
+        {items.map((item,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,background:C.bg,padding:"6px 10px",borderRadius:7,border:`1px solid ${C.b}`}}>
+            <span style={{flex:1,fontSize:12,color:C.t}}>{item}</span>
+            <button onClick={()=>rm(i)} style={{...S.btn("r"),padding:"2px 7px",fontSize:10}}>✕</button>
+          </div>
+        ))}
+        <div style={{display:"flex",gap:8}}>
+          <input style={{...S.inp,flex:1}} value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()} placeholder="Type item and press Enter"/>
+          <button onClick={add} style={S.btn("p")}>+</button>
+        </div>
+      </div>
+    );
+  };
+
+  const EditModal=({proto,name,onSv,onClose})=>{
+    const [p,setP]=useState({...proto});
+    const [n,setN]=useState(name);
+    return(
+      <div style={S.ovl}>
+        <div style={{...S.box(900),maxHeight:"none"}} className="fi">
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+            <div style={{fontSize:15,fontWeight:800,color:C.t}}>{name?"Edit Protocol":"New Protocol"}</div>
+            <button onClick={onClose} style={S.btn()}>✕</button>
+          </div>
+          <div style={S.g3}>
+            <div><Lbl t="Protocol Name"/><input style={S.inp} value={n} onChange={e=>setN(e.target.value)}/></div>
+            <div><Lbl t="Category"/><select style={S.sel} value={p.category||"Custom"} onChange={e=>setP(x=>({...x,category:e.target.value}))}>{PROTO_CATS.filter(c=>c!=="All").map(c=><option key={c}>{c}</option>)}</select></div>
+            <div><Lbl t="Colour"/><input type="color" style={{...S.inp,height:40,padding:4}} value={p.color||"#3B82F6"} onChange={e=>setP(x=>({...x,color:e.target.value}))}/></div>
+          </div>
+          <div style={S.dv}/>
+          <div style={{maxHeight:520,overflowY:"auto",paddingRight:6}}>
+            <SectionEditor proto={p} setProto={setP} k="investigations" label="Pre-Op Investigations" icon="🧪"/>
+            <SectionEditor proto={p} setProto={setP} k="preop_checklist" label="Pre-Op Checklist (PAC)" icon="✅"/>
+            <SectionEditor proto={p} setProto={setP} k="preop_orders" label="Pre-Op Orders" icon="📝"/>
+            <SectionEditor proto={p} setProto={setP} k="special_consent" label="Special Consent Points" icon="⚖️"/>
+            <SectionEditor proto={p} setProto={setP} k="materials" label="Materials & Equipment" icon="🛒"/>
+            <SectionEditor proto={p} setProto={setP} k="intraop" label="Intra-Op Requirements" icon="🔪"/>
+            <SectionEditor proto={p} setProto={setP} k="postop" label="Post-Op Orders" icon="💊"/>
+            <SectionEditor proto={p} setProto={setP} k="references" label="References" icon="📚"/>
+          </div>
+          <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:14}}>
+            <button onClick={onClose} style={S.btn()}>Cancel</button>
+            <button onClick={()=>{if(!n.trim())return alert("Protocol name required");onSv(n,p);onClose();}} style={S.btn("g")}>💾 Save Protocol</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const filtered=Object.entries(protos).filter(([,v])=>cat==="All"||v.category===cat);
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+        <div>
+          <div style={{fontSize:20,fontWeight:800,color:C.t}}>Protocol Manager</div>
+          <div style={{fontSize:12,color:C.sub,marginTop:3}}>Changes auto-save and sync across all devices</div>
+        </div>
+        <button onClick={()=>setShowNew(true)} style={S.btn("p")}>+ New Protocol</button>
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+        {PROTO_CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={{...S.btn(cat===c?"p":""),padding:"3px 12px",fontSize:12}}>{c}</button>)}
+      </div>
+      <div style={S.g2}>
+        {filtered.map(([name,proto])=>(
+          <div key={name} style={{...S.card,borderLeft:`4px solid ${proto.color||C.accent}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,color:C.t,fontSize:14,marginBottom:4}}>{name}</div>
+                <span style={{padding:"2px 8px",borderRadius:4,fontSize:11,fontWeight:600,background:`${proto.color||C.accent}18`,color:proto.color||C.accent,border:`1px solid ${proto.color||C.accent}25`}}>{proto.category||"General"}</span>
+                <div style={{fontSize:11,color:C.sub,marginTop:6}}>
+                  {(proto.investigations||[]).length} inv · {(proto.materials||[]).length} materials · {(proto.special_consent||[]).length} consent · {(proto.preop_orders||[]).length} pre-op orders
+                </div>
+              </div>
+              <div style={{display:"flex",gap:5,marginLeft:8}}>
+                <button onClick={()=>setEditing(name)} style={{...S.btn("p"),padding:"3px 10px",fontSize:11}}>✏️</button>
+                <button onClick={()=>{if(window.confirm(`Delete "${name}"?`)){const u={...protos};delete u[name];onSave(u);}}} style={{...S.btn("r"),padding:"3px 10px",fontSize:11}}>🗑️</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {editing&&<EditModal proto={protos[editing]} name={editing} onSv={(n,p)=>{const u={...protos};if(n!==editing)delete u[editing];u[n]=p;onSave(u);setEditing(null);}} onClose={()=>setEditing(null)}/>}
+      {showNew&&<EditModal proto={{name:"",category:"Custom",color:"#3B82F6",investigations:[],preop_checklist:[],preop_orders:[],special_consent:[],materials:[],intraop:[],postop:[],references:[]}} name="" onSv={(n,p)=>{if(!n.trim())return;onSave({...protos,[n]:p});setShowNew(false);}} onClose={()=>setShowNew(false)}/>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// SUPABASE SETUP GUIDE
+// ═══════════════════════════════════════════
+function SupaGuide({onClose}){
+  const SQL=`CREATE TABLE patients (
+  id text primary key,
+  data jsonb,
+  created_at timestamptz default now()
+);
+
+CREATE TABLE protocols (
+  name text primary key,
+  data jsonb
+);
+
+ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE protocols ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "open" ON patients
+  FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "open" ON protocols
+  FOR ALL USING (true) WITH CHECK (true);`;
+
+  const steps=[
+    ["1 · Create Free Account","Go to supabase.com → Start your project → Sign up (GitHub or email)"],
+    ["2 · New Project","Click New Project → Name: gmc-plastics → Set DB password → Region: South Asia → Create (takes ~2 min)"],
+    ["3 · Run SQL (creates tables)","Go to SQL Editor in left sidebar → paste the SQL below → click Run:"],
+    ["4 · Create Storage Bucket","Storage (left panel) → New bucket → Name: patient-photos → Set to PUBLIC → Create"],
+    ["5 · Get Your Keys","Settings (gear icon) → API → Copy: (1) Project URL (2) anon/public key"],
+    ["6 · Paste Keys in HTML","Open index.html in Notepad → Find line: const SURL='https://puwvywwysdbgyhcypocc.supabase.co' → Replace both values → Save → Upload to GitHub → Auto-deploys in 2 min"],
+  ];
+
+  return(
+    <div style={S.ovl}>
+      <div style={S.box(700)} className="fi">
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:14}}>
+          <div style={{fontSize:15,fontWeight:800,color:C.t}}>🗄️ Connect Supabase Backend</div>
+          <button onClick={onClose} style={S.btn()}>✕</button>
+        </div>
+        <div style={{padding:"9px 14px",background:"rgba(245,158,11,0.1)",borderRadius:8,border:`1px solid ${C.warn}30`,fontSize:12,color:"#F59E0B",marginBottom:14}}>
+          Currently running OFFLINE — data stored only in this browser. Follow these 6 steps to sync across ALL devices in real-time.
+        </div>
+        {steps.map(([t,d],i)=>(
+          <div key={i} style={{display:"flex",gap:12,marginBottom:10,padding:"10px 14px",background:C.bg,borderRadius:10,border:`1px solid ${C.b}`}}>
+            <div style={{width:26,height:26,borderRadius:"50%",background:`linear-gradient(135deg,#1D4ED8,${C.accent})`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:12,flexShrink:0}}>{i+1}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.t,marginBottom:3}}>{t}</div>
+              <div style={{fontSize:12,color:C.sub}}>{d}</div>
+              {i===2&&<textarea readOnly value={SQL} style={{...S.ta,marginTop:8,fontSize:11,fontFamily:"monospace",minHeight:160,color:"#86EFAC",background:"#0A1628"}}/>}
+            </div>
+          </div>
+        ))}
+        <div style={{padding:"9px 14px",background:"rgba(34,197,94,0.1)",borderRadius:8,border:"1px solid #22C55E30",fontSize:12,color:"#22C55E",marginBottom:14}}>
+          ✅ Once connected: all patients, protocols, and photos sync instantly across every device. Data is never lost even if browser cache is cleared.
+        </div>
+        <div style={{display:"flex",justifyContent:"flex-end"}}><button onClick={onClose} style={S.btn("p")}>Got it!</button></div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// PATIENT CARD
+// ═══════════════════════════════════════════
+function PatCard({patient,onClick,onDel,protos}){
+  const pr=PRIO[patient.priority];
+  const proto=protos[patient.diagnosis];
+  return(
+    <div onClick={()=>onClick(patient)} style={{...S.card,cursor:"pointer",borderLeft:`4px solid ${pr.c}`,transition:"border-color 0.2s"}} className="fi">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div style={{flex:1}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+            <span style={{fontSize:15,fontWeight:800,color:C.t}}>{patient.name}</span>
+            <span style={S.bdg(patient.priority)}>{pr.i} {patient.priority}</span>
+            {patient.allInvestigationsDone&&<span style={S.pil("#22C55E")}>✓ Cleared</span>}
+            {patient.refType==="Reference"&&<span style={S.pil("#A855F7")}>📨 Ref</span>}
+          </div>
+          <div style={{fontSize:11,color:C.sub,marginBottom:4}}>{patient.age}y/{patient.gender} · {patient.ward} · <span style={{color:C.mu}}>{patient.id}</span></div>
+          <div style={{fontSize:13,color:proto?.color||C.accent,fontWeight:600}}>{patient.diagnosis}</div>
+        </div>
+        <div style={{textAlign:"right",marginLeft:10,flexShrink:0}}>
+          <div style={S.pil(patient.status==="Cleared for OT"?"#22C55E":patient.status==="Post-Op"?"#3B82F6":C.warn)}>{patient.status}</div>
+          <div style={{fontSize:11,color:C.sub,marginTop:4}}>Dr. {patient.resident||"—"}</div>
+          <div style={{fontSize:11,color:C.mu}}>{patient.admitDate}</div>
+          <button onClick={e=>{e.stopPropagation();if(window.confirm("Delete this patient?"))onDel(patient.id);}} style={{...S.btn("r"),padding:"2px 8px",fontSize:10,marginTop:4}}>Delete</button>
+        </div>
+      </div>
+      {patient.notes&&<div style={{marginTop:7,fontSize:11,color:C.mu,borderTop:`1px solid ${C.b}`,paddingTop:6}}>{patient.notes.slice(0,100)}{patient.notes.length>100?"...":""}</div>}
+      {patient.refType==="Reference"&&patient.refDept&&<div style={{marginTop:6,fontSize:11,color:"#A855F7",fontWeight:600}}>📨 From: {patient.refDept} — Dr. {patient.refDoctorName||"—"}</div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════
+function App(){
+  const [view,setView]=useState("dashboard");
+  const [pts,setPts]=useState([]);
+  const [protos,setProtos]=useState(DP);
+  const [loading,setLoading]=useState(true);
+  const [sel,setSel]=useState(null);
+  const [showAdd,setShowAdd]=useState(false);
+  const [showSupa,setShowSupa]=useState(false);
+  const [search,setSearch]=useState("");
+  const [wf,setWf]=useState("All");
+  const [pf,setPf]=useState("All");
+
+  // ── Reference form detection ──────────────
+  // Works via URL hash: yourapp.vercel.app/#refer
+  const isRef=window.location.hash==="#refer";
+
+  useEffect(()=>{
+    (async()=>{
+      const[p,pr]=await Promise.all([DB.getPts(),DB.getProtos()]);
+      setPts(p);setProtos(pr);setLoading(false);
+    })();
+  },[]);
+
+  const addPt=async p=>{await DB.savePt(p);setPts(prev=>[p,...prev.filter(x=>x.id!==p.id)]);};
+  const updPt=async p=>{await DB.savePt(p);setPts(prev=>prev.map(x=>x.id===p.id?p:x));};
+  const delPt=async id=>{await DB.delPt(id);setPts(prev=>prev.filter(x=>x.id!==id));};
+  const saveProtos=async pr=>{setProtos(pr);await DB.saveProtos(pr);};
+
+  // Public reference form — no sidebar needed
+  if(isRef) return(
+    <RefForm
+      protos={protos}
+      onSubmit={async p=>{await addPt(p);}}
+      onBack={()=>{window.location.hash="";window.location.reload();}}
+    />
+  );
+
+  if(loading) return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",flexDirection:"column",gap:14}}>
+      <div className="sp" style={{width:38,height:38,border:"3px solid #1E3A5F",borderTopColor:C.accent,borderRadius:"50%"}}></div>
+      <div style={{color:C.sub,fontSize:14}}>Loading GMC Plastics v4...</div>
+    </div>
+  );
+
+  const filt=pts.filter(p=>{
+    const s=search.toLowerCase();
+    return(!s||p.name.toLowerCase().includes(s)||p.id.toLowerCase().includes(s)||p.diagnosis.toLowerCase().includes(s)||(p.resident||"").toLowerCase().includes(s))
+      &&(wf==="All"||p.ward===wf)
+      &&(pf==="All"||p.priority===pf);
+  });
+  const wardPts=filt.filter(p=>p.refType!=="Reference");
+  const refPts=filt.filter(p=>p.refType==="Reference");
+  const qPts=pts.filter(p=>p.allInvestigationsDone||LS.g('q_'+p.id,false));
+
+  // Share URL for reference form
+  const shareUrl=`${window.location.href.split('#')[0]}#refer`;
+
+  const NAV=[
+    {id:"dashboard",icon:"🏠",label:"Dashboard"},
+    {id:"ward",icon:"🛏️",label:"Ward Patients",cnt:pts.filter(p=>p.refType!=="Reference").length},
+    {id:"references",icon:"📨",label:"References",cnt:refPts.length},
+    {id:"otqueue",icon:"🏥",label:"OT Queue",cnt:qPts.length},
+    {id:"protocols",icon:"📋",label:"Protocol Manager"},
+  ];
+
+  const SC=({value,label,color,icon})=>(
+    <div style={{background:C.card,border:`1px solid ${C.b}`,borderRadius:12,padding:16,borderTop:`3px solid ${color}`}}>
+      <div style={{fontSize:26,fontWeight:800,color:C.t}}>{value}</div>
+      <div style={{fontSize:11,color:C.sub,marginTop:4,textTransform:"uppercase"}}>{icon} {label}</div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex"}}>
+
+      {/* ── SIDEBAR ── */}
+      <div style={{width:234,minHeight:"100vh",background:C.panel,borderRight:`1px solid ${C.b}`,position:"fixed",top:0,left:0,display:"flex",flexDirection:"column",zIndex:100}}>
+        <div style={{padding:"18px",borderBottom:`1px solid ${C.b}`}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+            <div style={{width:36,height:36,borderRadius:10,background:`linear-gradient(135deg,#1D4ED8,${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🏥</div>
+            <div>
+              <div style={{fontSize:14,fontWeight:800,color:C.t}}>GMC Plastics</div>
+              <div style={{fontSize:10,color:C.sub,textTransform:"uppercase",letterSpacing:"0.8px"}}>Patient Management v4</div>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}} onClick={()=>!SB&&setShowSupa(true)}>
+            <div style={{width:7,height:7,borderRadius:"50%",background:SB?"#22C55E":"#F59E0B",boxShadow:SB?"0 0 6px #22C55E":"0 0 6px #F59E0B"}}></div>
+            <span style={{fontSize:10,color:SB?"#22C55E":"#F59E0B"}}>{SB?"Cloud Sync Active":"Offline — tap to connect DB"}</span>
+          </div>
+        </div>
+        <div style={{padding:"10px 0",flex:1,overflowY:"auto"}}>
+          {NAV.map(item=>(
+            <div key={item.id} style={S.nav(view===item.id)} onClick={()=>setView(item.id)}>
+              <span style={{fontSize:16}}>{item.icon}</span>
+              <span style={{flex:1}}>{item.label}</span>
+              {item.cnt!==undefined&&<span style={{background:view===item.id?C.accent:C.card,color:"#fff",borderRadius:10,padding:"1px 8px",fontSize:11,fontWeight:700,border:`1px solid ${C.b}`}}>{item.cnt}</span>}
+            </div>
+          ))}
+        </div>
+        <div style={{padding:"12px 18px",borderTop:`1px solid ${C.b}`}}>
+          <div style={{fontSize:11,color:C.mu}}>Grant Medical College, Mumbai</div>
+          <div style={{fontSize:11,color:C.mu}}>Dept. of Plastic & Reconstructive Surgery</div>
+          <div style={{fontSize:11,color:C.accent,marginTop:4,fontWeight:600,cursor:"pointer"}} onClick={()=>setShowSupa(true)}>⚙️ Database Setup</div>
+        </div>
+      </div>
+
+      {/* ── MAIN CONTENT ── */}
+      <div style={{marginLeft:234,flex:1,padding:"20px 24px",minHeight:"100vh"}}>
+
+        {/* Topbar */}
+        <div style={{display:"flex",gap:9,marginBottom:18,alignItems:"center",flexWrap:"wrap"}}>
+          <input style={{...S.inp,maxWidth:280,flex:1}} placeholder="🔍 Search name, ID, diagnosis..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          <select style={{...S.sel,width:160}} value={wf} onChange={e=>setWf(e.target.value)}>
+            <option value="All">All Wards</option>
+            {WARDS.map(w=><option key={w}>{w}</option>)}
+          </select>
+          <select style={{...S.sel,width:145}} value={pf} onChange={e=>setPf(e.target.value)}>
+            <option value="All">All Priorities</option>
+            {Object.keys(PRIO).map(p=><option key={p}>{p}</option>)}
+          </select>
+          <button onClick={()=>setShowAdd(true)} style={S.btn("p")}>➕ New Patient</button>
+        </div>
+
+        {/* ── DASHBOARD ── */}
+        {view==="dashboard"&&(
+          <div>
+            <div style={{fontSize:21,fontWeight:800,color:C.t,marginBottom:3}}>Dashboard</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:20}}>Dept. of Plastic & Reconstructive Surgery · Grant Medical College & Hospital, Mumbai</div>
+            <div style={{...S.g3,marginBottom:20}}>
+              <SC value={pts.length} label="Total Patients" color={C.accent} icon="🛏️"/>
+              <SC value={pts.filter(p=>p.priority==="Emergency").length} label="Emergency" color="#EF4444" icon="🚨"/>
+              <SC value={pts.filter(p=>p.priority==="Urgent").length} label="Urgent" color="#FF7043" icon="⚡"/>
+              <SC value={qPts.length} label="Cleared for OT" color="#22C55E" icon="✅"/>
+              <SC value={refPts.length} label="References" color="#A855F7" icon="📨"/>
+              <SC value={Object.keys(protos).length} label="Protocols" color={C.teal} icon="📋"/>
+            </div>
+            <div style={S.g2}>
+              <div style={S.card}>
+                <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:12,textTransform:"uppercase"}}>Recent Patients</div>
+                {pts.slice(0,6).map(p=>(
+                  <div key={p.id} onClick={()=>setSel(p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${C.b}`,cursor:"pointer"}}>
+                    <div><span style={{fontWeight:600,color:C.t}}>{p.name}</span><span style={{fontSize:11,color:C.sub,marginLeft:8}}>{p.diagnosis.split(" ")[0]}</span></div>
+                    <span style={S.bdg(p.priority)}>{p.priority}</span>
+                  </div>
+                ))}
+                {pts.length===0&&<div style={{color:C.sub,fontSize:12,textAlign:"center",padding:20}}>No patients yet — click + New Patient</div>}
+              </div>
+              <div style={S.card}>
+                <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:10,textTransform:"uppercase"}}>📤 Reference Link (for Other Departments)</div>
+                <div style={{fontSize:12,color:C.sub,marginBottom:10,lineHeight:1.5}}>Share this link with ENT, Ortho, Medicine etc. They fill the form — patient appears here automatically.</div>
+                <div style={{display:"flex",gap:8,marginBottom:10}}>
+                  <input style={{...S.inp,flex:1,fontSize:11}} readOnly value={shareUrl}/>
+                  <button onClick={()=>{navigator.clipboard?.writeText(shareUrl).then(()=>alert("✅ Link copied! Paste and send to other departments."));}} style={S.btn("p")}>Copy</button>
+                </div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  <button onClick={()=>window.open(shareUrl,"_blank")} style={{...S.btn(),fontSize:12}}>🔗 Preview Form</button>
+                  <button onClick={()=>{const msg="GMC Plastic Surgery Reference Form:\n"+shareUrl;window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");}} style={{...S.btn(),background:"#25D366",fontSize:12}}>📲 WhatsApp</button>
+                </div>
+                <div style={S.dv}/>
+                <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:8,textTransform:"uppercase"}}>Quick Actions</div>
+                {[{i:"➕",l:"Add New Patient",f:()=>setShowAdd(true)},{i:"📋",l:"Protocol Manager",f:()=>setView("protocols")},{i:"🗄️",l:"Setup Cloud DB (Supabase)",f:()=>setShowSupa(true)},{i:"🏥",l:"View OT Queue",f:()=>setView("otqueue")}].map((a,idx)=>(
+                  <div key={idx} onClick={a.f} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 12px",borderRadius:8,cursor:"pointer",border:`1px solid ${C.b}`,marginBottom:5,background:C.bg}}>
+                    <span style={{fontSize:15}}>{a.i}</span>
+                    <span style={{fontSize:13,fontWeight:600,color:C.t,flex:1}}>{a.l}</span>
+                    <span style={{color:C.mu}}>→</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── WARD ── */}
+        {view==="ward"&&(
+          <div>
+            <div style={{fontSize:21,fontWeight:800,color:C.t,marginBottom:3}}>Ward Patients</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:18}}>{wardPts.length} patient(s) · Click a card to open</div>
+            {wardPts.length===0
+              ?<div style={{...S.card,textAlign:"center",padding:60,color:C.sub}}><div style={{fontSize:44}}>🛏️</div><Sp h={12}/>No patients yet — click + New Patient</div>
+              :wardPts.map(p=><PatCard key={p.id} patient={p} onClick={setSel} onDel={delPt} protos={protos}/>)}
+          </div>
+        )}
+
+        {/* ── REFERENCES ── */}
+        {view==="references"&&(
+          <div>
+            <div style={{fontSize:21,fontWeight:800,color:C.t,marginBottom:3}}>Inter-Department References</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:18}}>Patients referred from other departments</div>
+            <div style={{...S.card,background:`linear-gradient(135deg,${C.accent}08,${C.card})`,borderTop:`3px solid ${C.accent}`,marginBottom:18}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:8,textTransform:"uppercase"}}>📤 Shareable Reference Link</div>
+              <div style={{fontSize:12,color:C.sub,marginBottom:12,lineHeight:1.6}}>
+                Send this link to any department. They open it on any device (phone/laptop), fill in the patient details, and click submit — the patient appears here automatically. No login needed for the referring dept.
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                <input style={{...S.inp,flex:1,minWidth:200,fontSize:11}} readOnly value={shareUrl}/>
+                <button onClick={()=>{navigator.clipboard?.writeText(shareUrl).then(()=>alert("✅ Copied! Paste in WhatsApp or email to other depts."));}} style={S.btn("p")}>📋 Copy Link</button>
+                <button onClick={()=>window.open(shareUrl,"_blank")} style={S.btn()}>🔗 Preview</button>
+                <button onClick={()=>{const msg="GMC Plastic Surgery Reference Form:\n"+shareUrl;window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");}} style={{...S.btn(),background:"#25D366"}}>📲 WhatsApp</button>
+              </div>
+            </div>
+            {refPts.length===0
+              ?<div style={{...S.card,textAlign:"center",padding:40,color:C.sub}}><div style={{fontSize:36}}>📩</div><Sp h={10}/>No references yet — share the link above with other departments</div>
+              :refPts.map(p=><PatCard key={p.id} patient={p} onClick={setSel} onDel={delPt} protos={protos}/>)}
+          </div>
+        )}
+
+        {/* ── OT QUEUE ── */}
+        {view==="otqueue"&&(
+          <div>
+            <div style={{fontSize:21,fontWeight:800,color:C.t,marginBottom:3}}>OT Queue</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:18}}>Auto-sorted: Emergency → Urgent → Semi-Urgent → Elective</div>
+            {qPts.length===0
+              ?<div style={{...S.card,textAlign:"center",padding:60,color:C.sub}}><div style={{fontSize:44}}>🏥</div><Sp h={12}/>No patients in queue yet</div>
+              :[...qPts].sort((a,b)=>["Emergency","Urgent","Semi-Urgent","Elective"].indexOf(a.priority)-["Emergency","Urgent","Semi-Urgent","Elective"].indexOf(b.priority)).map((p,i)=>{
+                const pr=PRIO[p.priority];
+                return(
+                  <div key={p.id} onClick={()=>setSel(p)} style={{...S.card,borderLeft:`4px solid ${pr.c}`,cursor:"pointer"}} className="fi">
+                    <div style={{display:"flex",alignItems:"center",gap:14}}>
+                      <div style={{width:36,height:36,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:15,background:`${pr.c}18`,color:pr.c,flexShrink:0}}>{i+1}</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:700,color:C.t}}>{p.name} <span style={S.bdg(p.priority)}>{pr.i} {p.priority}</span></div>
+                        <div style={{fontSize:11,color:C.sub,marginTop:2}}>{p.diagnosis} · {p.ward} · Dr. {p.resident||"—"}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+
+        {view==="protocols"&&<ProtoManager protos={protos} onSave={saveProtos}/>}
+      </div>
+
+      {/* ── MODALS ── */}
+      {showAdd&&<PatForm onSave={async p=>{await addPt(p);setShowAdd(false);setView("ward");}} onClose={()=>setShowAdd(false)} protos={protos}/>}
+      {sel&&<PatDetail patient={sel} onClose={()=>setSel(null)} onUpdate={async p=>{await updPt(p);setSel(p);}} protos={protos}/>}
+      {showSupa&&<SupaGuide onClose={()=>setShowSupa(false)}/>}
+    </div>
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
