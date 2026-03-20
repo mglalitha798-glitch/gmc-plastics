@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
+<title>GMC Plastics PMS</title>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#060C18;-webkit-tap-highlight-color:transparent}
+body{color:#E2EAF4;font-family:'DM Sans',sans-serif;font-size:14px;overflow-x:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#0B1628}::-webkit-scrollbar-thumb{background:#1E3A5F;border-radius:4px}
+input,select,textarea,button{font-family:inherit;-webkit-appearance:none}
+select option{background:#0A0F1E;color:#E2EAF4}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.fi{animation:fadeIn 0.2s ease}
+.si{animation:slideIn 0.25s ease}
+.sp{animation:spin 0.7s linear infinite;display:inline-block;width:16px;height:16px;border:2px solid #1E3A5F;border-top-color:#3B82F6;border-radius:50%;vertical-align:middle}
+input:focus,select:focus,textarea:focus{outline:2px solid #3B82F6;outline-offset:1px}
+button:active{opacity:0.75}
+@media(max-width:600px){.hide-mobile{display:none!important}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback,useMemo}=React;
+
+// ═══════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════
+const SURL='https://puwvywwysdbgyhcypocc.supabase.co';
+const SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB1d3Z5d3d5c2RiZ3loY3lwb2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5OTkzNTAsImV4cCI6MjA4OTU3NTM1MH0.mcmpLm5sKZbzwPcHW_uWyjJCj_uyp3SlAXNoChXWft0';
+const SB=window.supabase.createClient(SURL,SKEY);
+
+// ── USERS (add more residents here) ─────────────────
+const USERS=[
+  {username:"drresident",password:"gmc2024",name:"Resident",role:"resident"},
+  {username:"drsenior",password:"senior2024",name:"Senior Resident",role:"senior"},
+  {username:"drfaculty",password:"faculty2024",name:"Faculty",role:"faculty"},
+  {username:"admin",password:"admin2024",name:"Admin",role:"admin"},
+];
+
+const LS={
+  g:(k,fb)=>{try{const d=localStorage.getItem(k);return d?JSON.parse(d):fb;}catch{return fb;}},
+  s:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+};
+
+// ═══════════════════════════════════════════════════
+// PROTOCOLS (condensed for space)
+// ═══════════════════════════════════════════════════
+const DP={
+  "Facial Fracture - Panfacial":{color:"#EF5350",category:"Trauma",
+    investigations:["CBC with differential","BMP: RFT, LFT, Electrolytes","Coagulation: PT, INR, aPTT","Blood group & cross-match (2 PRBC)","HbsAg, Anti-HCV, HIV ELISA","ECG 12-lead","Chest X-Ray PA","HRCT Face: axial + coronal + 3D","CT Brain plain","Ophthalmology: VA & fundus","Neurosurgery consult if needed"],
+    preop_checklist:["Consent with photographs obtained","2 PRBC cross-matched","Airway: anticipate difficult airway","Large bore IV x2","Foley catheter planned","Head-end elevation 30°"],
+    preop_orders:["Inj. Ceftriaxone 1g IV stat","Inj. Dexamethasone 8mg IV","Inj. Ondansetron 4mg IV","IV: 18G NS at KVO","NBM from midnight","Alert anaesthesia re: difficult airway"],
+    special_consent:["Blood transfusion consent","Facial nerve injury risk","Vision change / blindness risk","Malocclusion / bite change risk","Hardware palpability / removal risk","Scar / keloid risk","Re-operation risk"],
+    materials:["Titanium micro plates 1.0mm","Titanium mini plates 1.5mm & 2.0mm","Titanium mesh 0.4mm orbital floor","Screws: 4mm, 6mm, 8mm","Erich arch bars x2","IMF screws 1.5mm x20","3-0 Vicryl, 4-0 Nylon, 5-0 PDS","Corneal shields bilateral","Throat pack","Power drill + bur set","Rowe's forceps, Freer elevator"],
+    intraop:["Power drill & bur set","Titanium plates & screws","Arch bars + IMF screws","Nerve stimulator","Loupes x2","Corneal shields","Throat pack"],
+    postop:["Inj. Ceftriaxone 1g IV BD x5d","Inj. Metronidazole 500mg IV TDS x5d","Inj. Dexamethasone taper x3d","Chlorhexidine mouthwash TDS","Soft diet x6 weeks","Ice packs 20min q2h x48h","Ophthal review D1","Suture removal D7-10"],
+    references:["Manson PN - Facial Fractures Grabb & Smith 8th Ed","ATLS Primary & Secondary Survey","AO CMF aosurgery.org"]},
+  "STSG - Split Thickness Skin Graft":{color:"#42A5F5",category:"Reconstruction",
+    investigations:["CBC, BMP, Blood sugar fasting & PP","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Wound swab C/S","Blood group & cross-match","Albumin & Pre-albumin","HbA1c if diabetic"],
+    preop_checklist:["Wound bed: clean granulation present","C/S result reviewed","Albumin >3g/dL","FBS <180mg/dL","Pre-op wound photos","Donor site marked (ALT preferred)","Mesher available in OT"],
+    preop_orders:["Inj. Cefazolin 1g IV stat","Blood sugar check morning","Mark donor site","NBM from midnight","IV 18G, RL at 100ml/hr"],
+    special_consent:["Graft failure / partial take risk","Donor site scar and colour change","Hypertrophic scar / contracture risk","Re-grafting if take incomplete","Compression garment 6 months required"],
+    materials:["Humby/Watson knife","Dermatome blade 0.012-0.015 inch","Mesher + carrier 1:1.5 or 1:3","Mineral oil","Stapler","4-0 Nylon tie-over","Paraffin gauze Jelonet donor","Mepilex Ag / Aquacel Ag","NPWT/VAC if available"],
+    intraop:["Humby/Watson knife","Mesher + carrier","Mineral oil","Stapler","4-0 Nylon tie-over","Aquacel Ag"],
+    postop:["NPWT/bolster x5-7d, do NOT disturb","Donor dressing D10-14","Elevate limb","Graft check D5","Compression garment W3 x6m","Physio ROM from D7"],
+    references:["Ratner D - Skin Grafting Dermatol Clin 1998","Chang LK - Modern Wound Management PRS 2016"]},
+  "FTSG - Full Thickness Skin Graft":{color:"#26C6DA",category:"Reconstruction",
+    investigations:["CBC, BMP, Blood sugar","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Wound swab C/S if indicated","Albumin level"],
+    preop_checklist:["Defect measured, template made","Donor site pinch test done","Recipient bed vascularised","Pre-op photos taken"],
+    preop_orders:["Inj. Cefazolin 1g IV","Mark donor site","Template made","NBM from midnight"],
+    special_consent:["Graft failure/loss risk","Donor site linear scar","Colour mismatch","Re-grafting may be needed"],
+    materials:["Iris scissors curved x2","Skin hooks x4","Defatting scissors","4-0/5-0 Nylon","Cotton wool bolster","Aluminium foil template"],
+    intraop:["Iris scissors","Skin hooks","Defatting scissors","Nylon 4-0/5-0","Cotton bolster"],
+    postop:["Bolster tie-over x7-10d","Suture removal D10-14","SPF50+ x6m","Scar management from 3w"],
+    references:["Sclafani AP - FTSG eMedicine"]},
+  "Rotation / Local Flap":{color:"#AB47BC",category:"Reconstruction",
+    investigations:["CBC, BMP, Blood sugar","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Wound swab C/S if infected","Doppler if perforator flap","Albumin level"],
+    preop_checklist:["Defect mapped L×W×D","Flap design drawn methylene blue","Pivot point marked","Length:width ≤3:1","Pre-op photos","Tourniquet plan if extremity"],
+    preop_orders:["Mark flap methylene blue","Inj. Cefazolin 1g IV","Tourniquet 250mmHg if extremity","NBM from midnight"],
+    special_consent:["Partial or complete flap necrosis","Donor site scar","Wound dehiscence risk","Skin graft if flap fails"],
+    materials:["No.15 blade x2","Skin hooks x4","Bipolar diathermy","3-0 Vicryl, 3-0/4-0 Nylon","Suction drain if needed","Doppler probe if perforator"],
+    intraop:["No.15 blade","Skin hooks","Bipolar + monopolar","3-0 Vicryl, 4-0 Nylon","Drain if needed"],
+    postop:["Flap monitoring hourly x24h","No pressure on flap","Amoxicillin-Clav x5d","Suture removal D10-14"],
+    references:["Hallock GG - Local Flaps PRS 2014"]},
+  "Post-Burn Contracture Release":{color:"#FF8F00",category:"Burns & Contracture",
+    investigations:["CBC, BMP, Blood sugar","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Blood group & cross-match","Doppler if vascular compromise","Wound swab C/S","Albumin","X-ray of joint"],
+    preop_checklist:["Contracture grade I-IV documented","ROM measured pre-op","Albumin >3g/dL","CRITICAL: airway if neck","Graft/flap decision made","Splint fabricated pre-op"],
+    preop_orders:["Inj. Cefazolin 1g IV","Tourniquet 250mmHg for limb","Splint ready in OT","NBM from midnight","Mark release and donor site"],
+    special_consent:["Incomplete release risk","Graft failure risk","Donor site scar","Recurrence especially paediatric","Long-term splinting 3-6 months"],
+    materials:["Humby knife / dermatome","Mesher","Ruler + callipers for Z-plasty","Kirschner wires for joints","Thermoplastic splint","Aquacel Ag / Mepilex Ag","NPWT if available"],
+    intraop:["Dermatome","Mesher","Callipers + ruler","Splint ready","K-wires if needed","NPWT/VAC"],
+    postop:["Splint x3-6w continuously","Physio ROM D7 supervised","Compression garment 3w","Silicone gel from 6w","Pressure therapy x12-18m"],
+    references:["Wainwright DJ - Post-Burn Scar Management Clin Plast Surg 2009"]},
+  "Burns - Acute Management":{color:"#FF5722",category:"Burns & Contracture",
+    investigations:["CBC with differential","BMP: electrolytes critical","ABG if inhalation injury","Coagulation profile","Blood group & cross-match","Urine myoglobin (electrical)","Foley: hourly UO","CXR for inhalation","COHb if smoke inhalation"],
+    preop_checklist:["TBSA calculated Rule of Nines","Burn depth classified","Parkland formula started","50% in first 8h FROM TIME OF BURN","Airway secured if face/neck","Tetanus prophylaxis given","Escharotomy if circumferential","Target UO 0.5-1ml/kg/hr"],
+    preop_orders:["Two large bore IVs Hartmann's Parkland","Foley hourly UO chart","Inj. Morphine 0.1mg/kg IV","Inj. Tetanus toxoid IM","Warm OT >28°C","NGT if >20% TBSA"],
+    special_consent:["TBSA and depth explained","Mortality risk Baux score","Multiple surgeries likely","Scarring and contractures","Blood transfusion consent"],
+    materials:["Humby/Watson dermatome","Mesher 1:3 for large burns","Mepilex Ag / Aquacel Ag","Stapler","NPWT/VAC","Warm saline packs","Cell saver if >40% TBSA"],
+    intraop:["Dermatome","Mesher","Silver dressings","Stapler","NPWT/VAC","Warm saline packs"],
+    postop:["Strict I/O: UO >0.5ml/kg/hr","Burns chart daily","Early enteral feeding within 6h","Physio from Day 1","Wound swab C/S every 48h"],
+    references:["ABA Guidelines 2023","Herndon DN - Total Burn Care 5th Ed"]},
+  "Gynaecomastia Surgery":{color:"#26A69A",category:"Aesthetic & Body",
+    investigations:["CBC, BMP, LFT, RFT","Coagulation profile","HbsAg, Anti-HCV, HIV ELISA","Hormones: T, E2, LH, FSH, Prolactin, TSH","FNAC/Core biopsy if suspicious","USG chest bilateral"],
+    preop_checklist:["Simon's grade documented","Cause identified","Pre-op photos AP lateral oblique","Compression vest arranged"],
+    preop_orders:["Inj. Cefazolin 1g IV","Tumescent: 500ml NS + 1mg Adr + 20ml Xylocaine","Mark periareolar + liposuction area","NBM from midnight"],
+    special_consent:["Recurrence risk","Nipple-areola necrosis","Asymmetry","Seroma or haematoma","Nipple sensory change"],
+    materials:["Liposuction cannulas 3-4mm","Tumescent infiltration cannula","No.15 blade","Bipolar diathermy","Blake drain","3-0 Vicryl, 4-0 Monocryl","Compression vest"],
+    intraop:["Liposuction cannulas","Tumescent solution","No.15 blade","Bipolar","Suction drain","Compression vest"],
+    postop:["Compression vest x6w","Drain out <30ml/24h","Diclofenac 75mg BD x2d","Amox-Clav x5d","No strenuous activity x6w"],
+    references:["Simon BE - Gynaecomastia Classification PRS 1973","Rohrich RJ - Algorithm PRS 2003"]},
+  "Breast Reduction":{color:"#EC407A",category:"Aesthetic & Body",
+    investigations:["CBC, BMP, Coagulation","HbsAg, Anti-HCV, HIV ELISA","Blood group & cross-match","Mammography if >35y","USG breast bilateral","Cardiac clearance if BMI >35"],
+    preop_checklist:["SN-nipple distance bilateral","Ptosis grade documented","Pre-op photos standing","DVT: TED + LMWH planned"],
+    preop_orders:["Inj. Cefazolin 1g IV","Inj. LMWH Enoxaparin 40mg SC","TED stockings pre-induction","Markings patient standing","NBM from midnight"],
+    special_consent:["Nipple loss partial/complete","Asymmetry","T-junction wound breakdown","Permanent scars","Lactation may be impaired","DVT/PE risk"],
+    materials:["Wise/vertical pattern template","Marking callipers","Bipolar","3-0 Vicryl, 3-0 PDS, 4-0 Monocryl","Blake drains bilateral","Surgical bra","Steri-strips T-junction"],
+    intraop:["Template + callipers","Bipolar","3-0 Vicryl, 3-0 PDS, 4-0 Monocryl","Blake drains","Surgical bra"],
+    postop:["Surgical bra x6w","Drains out <30ml/day","LMWH x5d","Amox-Clav x5d","Silicone gel from 3w"],
+    references:["Hall-Findlay EJ - Reduction Mammoplasty 2nd Ed","BAPRAS Guidelines 2022"]},
+  "Lower 1/3 Face - Free Flap":{color:"#7E57C2",category:"Oncoplastic",
+    investigations:["CBC, BMP, LFT, RFT","Coagulation","Blood group cross-match 2PRBC+2FFP","Biopsy/HPE report","CECT Head & Neck","PET CT if malignancy","2D Echo","CTA/MRA neck vessels","Doppler ALT perforators + Allen's test","Oncology MDT clearance","Albumin, Pre-albumin, BMI"],
+    preop_checklist:["MDT clearance documented","Recipient vessel mapping done","Donor site marked","Two-team briefed","ICU/HDU bed confirmed","Tracheostomy consent","NG tube planned"],
+    preop_orders:["Admit HDU night before","IV x2 large bore + arterial line","Inj. Ceftriaxone + Metronidazole IV","Inj. LMWH pre-op","ICU bed confirmed"],
+    special_consent:["Flap failure requiring re-operation","Tracheostomy permanent/temporary","NG feeding 4-6 weeks","Donor site morbidity","Total flap loss","Long-term speech rehab"],
+    materials:["Operating microscope","Microsurgery set","Anastomosis coupler 2.5-3mm","Intraop Doppler","Bipolar fine tip","Loupes x2","Prolene 8-0, 9-0","Heparinised saline"],
+    intraop:["Microsurgery set","Operating microscope","Anastomosis coupler","Intraop Doppler","Prolene 8-0/9-0","Heparinised saline"],
+    postop:["ICU/HDU x48-72h","Hourly flap monitoring","Inj. Heparin 5000U SC BD","Tab. Aspirin 75mg OD","NG feeding from 6h","NO pressure on pedicle"],
+    references:["Wei FC Mardini S - Flaps & Reconstructive Surgery 2nd Ed","Neligan P - Plastic Surgery 4th Ed Vol 3"]},
+  "Cleft Lip - Primary Repair":{color:"#66BB6A",category:"Congenital",
+    investigations:["CBC, BMP","Blood group & cross-match","HbsAg, Anti-HCV, HIV ELISA","Weight and feeding assessment","URTI screening","Cardiac echo mandatory","Hb ≥10g/dL confirmed"],
+    preop_checklist:["Rule of 10s: ≥10w, ≥10lbs, Hb ≥10","No URTI in 2 weeks","Cardiac clearance","Millard/Fisher markings done","Pre-op photos","Arm splints prepared"],
+    preop_orders:["Paediatric IV 22G","IV DNS at maintenance","Inj. Ampicillin 25mg/kg IV","Arm splints before extubation","No suckling post-op","Warm OT"],
+    special_consent:["Revisional surgery expected at adolescence","Permanent scar on lip","Asymmetry lip/nose","Wound dehiscence risk","Secondary nasal surgery","Orthodontic treatment required"],
+    materials:["Callipers + ruler","No.15 blade","Iris scissors curved","Skin hooks x4","4-0 Vicryl, 5-0 PDS, 6-0 Monocryl","Logan's bow","Arm/elbow splints"],
+    intraop:["Callipers + ruler","No.15 blade","Iris scissors","4-0 Vicryl, 5-0 PDS, 6-0 Monocryl","Logan's bow","Arm splints"],
+    postop:["Arm restraints x4w","Syringe/cup feeding x2w","Wound: saline + antibiotic ointment BD","Paracetamol suspension","Review D7, 1m, 3m, 1y"],
+    references:["Millard DR - Cleft Craft Vol 1","Fisher DM - Unilateral Cleft Lip PRS 2005"]}
+};
+
+const PRIO={Emergency:{c:"#EF5350",i:"🚨"},Urgent:{c:"#FF7043",i:"⚡"},"Semi-Urgent":{c:"#FFA726",i:"🔶"},Elective:{c:"#66BB6A",i:"📋"}};
+const WARDS=["Ward 9A - Plastics Male","Ward 9B - Plastics Female","Ward 9C - Burns","ICU / HDU","PACU / Recovery","OPD / Outpatient","Emergency Dept."];
+
+const C={bg:"#060C18",panel:"#0B1628",card:"#0F1E36",b:"#162847",accent:"#3B82F6",t:"#E2EAF4",sub:"#5E7A9E",mu:"#3B5278",ok:"#22C55E",warn:"#F59E0B",err:"#EF4444",teal:"#14B8A6"};
+
+// ═══════════════════════════════════════════════════
+// DATABASE
+// ═══════════════════════════════════════════════════
+const DB={
+  async getPts(){const{data,error}=await SB.from('patients').select('*').order('created_at',{ascending:false});if(!error&&data)return data.map(r=>r.data||r);return LS.g('pts_v5',[]);},
+  async savePt(p){await SB.from('patients').upsert({id:p.id,data:p,created_at:p.created_at||new Date().toISOString()},{onConflict:'id'});const all=LS.g('pts_v5',[]);LS.s('pts_v5',[p,...all.filter(x=>x.id!==p.id)]);return p;},
+  async delPt(id){await SB.from('patients').delete().eq('id',id);LS.s('pts_v5',LS.g('pts_v5',[]).filter(p=>p.id!==id));},
+  async getProtos(){const{data}=await SB.from('protocols').select('*');if(data&&data.length){const o={};data.forEach(r=>o[r.name]=r.data);return o;}return LS.g('protos_v5',DP);},
+  async saveProtos(pr){const rows=Object.entries(pr).map(([name,data])=>({name,data}));await SB.from('protocols').upsert(rows,{onConflict:'name'});LS.s('protos_v5',pr);},
+  async uploadPhoto(path,file){
+    const ext=file.name.split('.').pop()||'jpg';
+    const fp=`${path}_${Date.now()}.${ext}`;
+    const{error}=await SB.storage.from('patient-photos').upload(fp,file,{contentType:file.type,upsert:true});
+    if(error)throw error;
+    const{data:u}=SB.storage.from('patient-photos').getPublicUrl(fp);
+    return u.publicUrl;
+  },
+  getChks:(pid)=>LS.g('chk_'+pid,{}),setChks:(pid,v)=>LS.s('chk_'+pid,v),
+  getPhotos:(pid)=>LS.g('pho_'+pid,{}),setPhotos:(pid,v)=>LS.s('pho_'+pid,v),
+  getOrders:(pid)=>LS.g('ord_'+pid,[]),setOrders:(pid,v)=>LS.s('ord_'+pid,v),
+  getDS:(pid)=>LS.g('ds_'+pid,{}),setDS:(pid,v)=>LS.s('ds_'+pid,v),
+};
+
+// ═══════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════
+const S={
+  card:{background:C.card,border:`1px solid ${C.b}`,borderRadius:12,padding:16,marginBottom:10},
+  inp:{background:C.bg,border:`1px solid ${C.b}`,borderRadius:10,padding:"10px 14px",color:C.t,fontSize:14,width:"100%",outline:"none"},
+  sel:{background:C.bg,border:`1px solid ${C.b}`,borderRadius:10,padding:"10px 14px",color:C.t,fontSize:14,width:"100%",outline:"none"},
+  ta:{background:C.bg,border:`1px solid ${C.b}`,borderRadius:10,padding:"10px 14px",color:C.t,fontSize:14,width:"100%",outline:"none",resize:"vertical"},
+  lbl:{fontSize:11,color:C.sub,marginBottom:5,display:"block",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.5px"},
+  btn:(v="p",full)=>({padding:v==="sm"?"6px 10px":"11px 18px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:700,fontSize:v==="sm"?12:14,fontFamily:"inherit",width:full?"100%":"auto",
+    background:v==="p"?`linear-gradient(135deg,#1D4ED8,${C.accent})`:v==="g"?"#15803D":v==="r"?"#991B1B":v==="y"?"#92400E":v==="teal"?C.teal:C.card,color:"#fff",transition:"opacity 0.15s"}),
+  bdg:(p)=>({display:"inline-flex",alignItems:"center",gap:3,padding:"3px 8px",borderRadius:20,fontSize:12,fontWeight:700,background:`${PRIO[p]?.c}20`,color:PRIO[p]?.c,border:`1px solid ${PRIO[p]?.c}35`}),
+  pil:(col,size)=>({display:"inline-flex",alignItems:"center",padding:size==="sm"?"2px 7px":"4px 10px",borderRadius:20,fontSize:size==="sm"?11:12,fontWeight:600,background:`${col}18`,color:col,border:`1px solid ${col}30`}),
+  chkrow:(done)=>({display:"flex",alignItems:"flex-start",gap:10,padding:"10px 12px",borderRadius:10,marginBottom:5,background:done?"rgba(34,197,94,0.07)":"rgba(59,130,246,0.03)",border:`1px solid ${done?"#22C55E35":C.b}`,cursor:"pointer"}),
+  g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12},
+  ovl:{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:200,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"16px 12px",overflowY:"auto"},
+  box:(w=800)=>({background:C.panel,border:`1px solid ${C.b}`,borderRadius:16,padding:20,width:"100%",maxWidth:w}),
+  sh:{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",background:C.bg,borderRadius:10,marginBottom:8,cursor:"pointer",border:`1px solid ${C.b}`,userSelect:"none"},
+  dv:{height:1,background:C.b,margin:"14px 0"},
+};
+const CB=({chk,on})=>(
+  <div onClick={on} style={{width:20,height:20,borderRadius:6,border:`2px solid ${chk?"#22C55E":C.mu}`,background:chk?"#22C55E":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1,cursor:"pointer"}}>
+    {chk&&<span style={{color:"#fff",fontSize:11,fontWeight:800}}>✓</span>}
+  </div>
+);
+const Sp=({h=10})=><div style={{height:h}}/>;
+const Lbl=({t})=><label style={S.lbl}>{t}</label>;
+const Sect=({title,color=C.accent,children})=>(
+  <div style={{marginBottom:16}}>
+    <div style={{fontSize:11,fontWeight:700,color,textTransform:"uppercase",letterSpacing:"0.6px",marginBottom:8,paddingLeft:4}}>{title}</div>
+    {children}
+  </div>
+);
+
+// ═══════════════════════════════════════════════════
+// LOGIN PAGE
+// ═══════════════════════════════════════════════════
+function LoginPage({onLogin}){
+  const [u,setU]=useState(""); const [p,setP]=useState(""); const [err,setErr]=useState(""); const [busy,setBusy]=useState(false);
+  const login=()=>{
+    setBusy(true); setErr("");
+    setTimeout(()=>{
+      const user=USERS.find(x=>x.username===u.trim()&&x.password===p);
+      if(user){LS.s('gmc_session',{...user,ts:Date.now()});onLogin(user);}
+      else setErr("Invalid username or password");
+      setBusy(false);
+    },400);
+  };
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{width:"100%",maxWidth:400}} className="fi">
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{width:64,height:64,borderRadius:18,background:`linear-gradient(135deg,#1D4ED8,${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,margin:"0 auto 16px"}}>🏥</div>
+          <div style={{fontSize:26,fontWeight:800,color:C.t,fontFamily:"Syne"}}>GMC Plastics</div>
+          <div style={{fontSize:13,color:C.sub,marginTop:4}}>Dept. of Plastic & Reconstructive Surgery</div>
+          <div style={{fontSize:12,color:C.mu,marginTop:2}}>Grant Medical College & Hospital, Mumbai</div>
+        </div>
+        <div style={S.card}>
+          <Sect title="Sign In">
+            <div style={{marginBottom:14}}>
+              <Lbl t="Username"/>
+              <input style={S.inp} value={u} onChange={e=>setU(e.target.value)} placeholder="Enter username" autoCapitalize="none" autoCorrect="off" onKeyDown={e=>e.key==="Enter"&&login()}/>
+            </div>
+            <div style={{marginBottom:16}}>
+              <Lbl t="Password"/>
+              <input style={S.inp} type="password" value={p} onChange={e=>setP(e.target.value)} placeholder="Enter password" onKeyDown={e=>e.key==="Enter"&&login()}/>
+            </div>
+            {err&&<div style={{padding:"8px 12px",background:"rgba(239,68,68,0.1)",borderRadius:8,color:"#EF4444",fontSize:13,marginBottom:12}}>⚠️ {err}</div>}
+            <button onClick={login} style={S.btn("p",true)} disabled={busy}>
+              {busy?<span className="sp"/>:"🔐 Sign In"}
+            </button>
+          </Sect>
+        </div>
+        <div style={{textAlign:"center",fontSize:11,color:C.mu,marginTop:16}}>Default: drresident / gmc2024</div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// INVESTIGATION ROW + PHOTO UPLOAD
+// ═══════════════════════════════════════════════════
+function InvRow({item,idx,patId,checked,onChk,photos,onAddPhoto,readOnly}){
+  const [exp,setExp]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const fRef=useRef(); const cRef=useRef();
+  const key='inv_'+idx;
+  const mine=photos[key]||[];
+  const handle=async file=>{
+    if(!file)return;
+    setBusy(true);
+    try{const url=await DB.uploadPhoto(`${patId}/inv_${idx}`,file);onAddPhoto(key,{url,name:file.name,ts:Date.now()});}
+    catch(e){
+      const url=await new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(file);});
+      onAddPhoto(key,{url,name:file.name,ts:Date.now()});
+    }
+    setBusy(false);setExp(true);
+  };
+  return(
+    <div style={{marginBottom:6}}>
+      <div style={S.chkrow(checked)} onClick={()=>!readOnly&&onChk(key)}>
+        {!readOnly&&<CB chk={checked} on={()=>onChk(key)}/>}
+        {readOnly&&<div style={{width:20,height:20,borderRadius:6,background:checked?"#22C55E20":"transparent",border:`2px solid ${checked?"#22C55E":C.mu}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>{checked&&<span style={{fontSize:11,color:"#22C55E"}}>✓</span>}</div>}
+        <span style={{flex:1,fontSize:13,color:checked?"#5E7A9E":C.t,textDecoration:checked?"line-through":"none",lineHeight:1.4}}>{item}</span>
+        <div style={{display:"flex",gap:5,marginLeft:8}} onClick={e=>e.stopPropagation()}>
+          {mine.length>0&&<button onClick={()=>setExp(!exp)} style={{...S.btn("sm"),background:"rgba(59,130,246,0.18)",color:C.accent}}>📎{mine.length}</button>}
+          <button onClick={()=>fRef.current?.click()} style={{...S.btn("sm"),background:"rgba(59,130,246,0.1)",color:C.accent}} title="Upload">{busy?<span className="sp"/>:"📁"}</button>
+          <button onClick={()=>cRef.current?.click()} style={{...S.btn("sm"),background:"rgba(20,184,166,0.1)",color:C.teal}} title="Camera">📷</button>
+          <input ref={fRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={e=>{handle(e.target.files[0]);e.target.value="";}}/>
+          <input ref={cRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{handle(e.target.files[0]);e.target.value="";}}/>
+        </div>
+      </div>
+      {exp&&mine.length>0&&(
+        <div style={{marginLeft:30,marginBottom:6,display:"flex",flexWrap:"wrap",gap:8}}>
+          {mine.map((ph,pi)=>(
+            <div key={pi}>{(ph.url.startsWith('data:image')||ph.url.startsWith('http'))
+              ?<img src={ph.url} alt={ph.name} style={{width:80,height:80,objectFit:"cover",borderRadius:8,border:`1px solid ${C.b}`,cursor:"pointer"}} onClick={()=>window.open(ph.url,'_blank')}/>
+              :<a href={ph.url} target="_blank" rel="noreferrer" style={{display:"flex",gap:5,alignItems:"center",padding:"5px 10px",background:C.card,borderRadius:8,border:`1px solid ${C.b}`,color:C.accent,fontSize:12,textDecoration:"none"}}>📄 {ph.name}</a>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// PROTOCOL PANEL
+// ═══════════════════════════════════════════════════
+function ProtPanel({diagnosis,patId,protos,readOnly}){
+  const proto=protos[diagnosis];
+  const [chks,setChks]=useState(()=>DB.getChks(patId));
+  const [photos,setPhotos]=useState(()=>DB.getPhotos(patId));
+  const [open,setOpen]=useState("investigations");
+  useEffect(()=>DB.setChks(patId,chks),[chks,patId]);
+  useEffect(()=>DB.setPhotos(patId,photos),[photos,patId]);
+  if(!proto)return<div style={{...S.card,textAlign:"center",padding:40,color:C.sub}}>No protocol found for this diagnosis.</div>;
+  const tog=k=>!readOnly&&setChks(p=>({...p,[k]:!p[k]}));
+  const addPhoto=(key,ph)=>setPhotos(p=>({...p,[key]:[...(p[key]||[]),ph]}));
+  const allInvDone=(proto.investigations||[]).every((_,i)=>chks['inv_'+i]);
+  const Sec=({k,icon,title,items,isInv})=>{
+    const isOpen=open===k;
+    return(
+      <div style={{marginBottom:10}}>
+        <div style={S.sh} onClick={()=>setOpen(isOpen?null:k)}>
+          <span style={{fontSize:16}}>{icon}</span>
+          <span style={{fontWeight:700,color:C.t,flex:1,fontSize:14}}>{title}</span>
+          <span style={{color:C.mu,fontSize:14}}>{isOpen?"▲":"▼"}</span>
+        </div>
+        {isOpen&&(items||[]).map((item,i)=>{
+          const key=isInv?'inv_'+i:`${k}_${i}`;
+          return isInv
+            ?<InvRow key={i} item={item} idx={i} patId={patId} checked={!!chks['inv_'+i]} onChk={tog} photos={photos} onAddPhoto={addPhoto} readOnly={readOnly}/>
+            :<div key={i} style={S.chkrow(!!chks[key])} onClick={()=>tog(key)}>
+              {!readOnly&&<CB chk={!!chks[key]} on={()=>tog(key)}/>}
+              <span style={{fontSize:13,color:chks[key]?"#5E7A9E":C.t,textDecoration:chks[key]?"line-through":"none",lineHeight:1.4}}>{item}</span>
+            </div>;
+        })}
+      </div>
+    );
+  };
+  return(
+    <div>
+      <div style={{...S.card,background:`linear-gradient(135deg,${proto.color}12,${C.card})`,borderLeft:`4px solid ${proto.color}`,marginBottom:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+          <div>
+            <div style={{fontSize:11,color:proto.color,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:4}}>🤖 Protocol Loaded</div>
+            <div style={{fontSize:15,fontWeight:800,color:C.t}}>{diagnosis}</div>
+          </div>
+          <span style={{padding:"3px 10px",borderRadius:6,fontSize:12,fontWeight:600,background:`${proto.color}18`,color:proto.color,border:`1px solid ${proto.color}25`}}>{proto.category}</span>
+        </div>
+        {allInvDone&&<div style={{marginTop:10,padding:"7px 12px",background:"rgba(34,197,94,0.1)",borderRadius:8,color:"#22C55E",fontSize:13,fontWeight:600}}>✅ All investigations checked</div>}
+      </div>
+      <Sec k="investigations" icon="🧪" title="Investigations" items={proto.investigations} isInv={true}/>
+      <Sec k="preop" icon="✅" title="Pre-Op Checklist" items={proto.preop_checklist}/>
+      <Sec k="preop_orders" icon="📝" title="Pre-Op Orders" items={proto.preop_orders}/>
+      <Sec k="special_consent" icon="⚖️" title="Special Consent" items={proto.special_consent}/>
+      <Sec k="materials" icon="🛒" title="Materials & Equipment" items={proto.materials}/>
+      <Sec k="intraop" icon="🔪" title="Intra-Op" items={proto.intraop}/>
+      <Sec k="postop" icon="💊" title="Post-Op Orders" items={proto.postop}/>
+      <Sec k="references" icon="📚" title="References" items={proto.references}/>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// DISCHARGE SUMMARY
+// ═══════════════════════════════════════════════════
+function DSSummary({patient,proto}){
+  const [ds,setDs]=useState(()=>DB.getDS(patient.id));
+  const upd=(k,v)=>setDs(p=>({...p,[k]:v}));
+  useEffect(()=>DB.setDS(patient.id,ds),[ds,patient.id]);
+  const F=({label,k,rows=3,hint=""})=>(
+    <div style={{marginBottom:14}}>
+      <Lbl t={label}/>
+      <textarea style={{...S.ta,minHeight:rows*30}} value={ds[k]||""} onChange={e=>upd(k,e.target.value)} placeholder={hint||`Enter ${label.toLowerCase()}...`}/>
+    </div>
+  );
+  const print=()=>{
+    const w=window.open('','_blank');
+    w.document.write(`<!DOCTYPE html><html><head><title>Discharge - ${patient.name}</title>
+<style>body{font-family:Arial,sans-serif;font-size:10.5pt;margin:15mm 18mm}h1{font-size:13pt;text-align:center;color:#1B3A6B;border-bottom:2px solid #1B3A6B;padding-bottom:5px}h2{font-size:10.5pt;color:#1B3A6B;margin:10px 0 3px;border-bottom:1px solid #bcd;padding-bottom:2px}.g{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px}.f{background:#f5f7ff;padding:4px 8px;border-radius:3px;border:1px solid #dde}.fl{font-size:8pt;color:#777;font-weight:bold;text-transform:uppercase}.fv{font-size:10pt;margin-top:1px}.sec{padding:5px 10px;border-left:3px solid #1B3A6B;background:#f9faff;white-space:pre-wrap;margin-bottom:6px;font-size:10pt}.sig{display:flex;justify-content:space-between;margin-top:30px}.sig div{text-align:center;border-top:1px solid #555;padding-top:3px;width:155px;font-size:9pt}.ft{text-align:right;font-size:8pt;color:#888;margin-top:14px}</style></head><body>
+<h1>GRANT MEDICAL COLLEGE & HOSPITAL, MUMBAI<br/><span style="font-size:10.5pt">Dept. of Plastic & Reconstructive Surgery</span><br/><span style="font-size:9pt;color:#555">DISCHARGE SUMMARY</span></h1>
+<div class="g">${[["Patient",patient.name],["IPD No.",patient.id],["Age/Gender",`${patient.age}y/${patient.gender}`],["Ward",patient.ward],["Admitted",patient.admitDate],["Discharged",new Date().toLocaleDateString('en-IN')],["Diagnosis",patient.diagnosis],["Resident",`Dr. ${patient.resident}`]].map(([k,v])=>`<div class="f"><div class="fl">${k}</div><div class="fv">${v||'—'}</div></div>`).join('')}</div>
+${ds.chiefComplaint?`<h2>Chief Complaint</h2><div class="sec">${ds.chiefComplaint}</div>`:''}
+${ds.history?`<h2>History of Present Illness</h2><div class="sec">${ds.history}</div>`:''}
+${ds.pastHistory?`<h2>Past History / Co-morbidities</h2><div class="sec">${ds.pastHistory}</div>`:''}
+${ds.examination?`<h2>Examination Findings</h2><div class="sec">${ds.examination}</div>`:''}
+${ds.investigations?`<h2>Investigations</h2><div class="sec">${ds.investigations}</div>`:''}
+${ds.treatment?`<h2>Treatment Given</h2><div class="sec">${ds.treatment}</div>`:''}
+${ds.procedure?`<h2>Procedure / Operation Details</h2><div class="sec">${ds.procedure}</div>`:''}
+${ds.course?`<h2>Course in Hospital</h2><div class="sec">${ds.course}</div>`:''}
+<h2>Advice on Discharge</h2><div class="sec">${(proto?.postop||[]).slice(0,6).join('\n')}${ds.advice?'\n\nAdditional:\n'+ds.advice:''}</div>
+${ds.medications?`<div class="sec"><strong>Medications:</strong>\n${ds.medications}</div>`:''}
+${ds.diet?`<div class="sec"><strong>Diet:</strong> ${ds.diet}</div>`:''}
+${ds.activity?`<div class="sec"><strong>Activity:</strong> ${ds.activity}</div>`:''}
+<h2>Follow-Up</h2><div class="sec">${ds.followupDate?'Review: '+ds.followupDate+'\n':''}${ds.followup||'Review at Plastics OPD. Return if fever, wound opening, or any concern.'}</div>
+${ds.emergency?`<div class="sec"><strong>Emergency Contact:</strong> ${ds.emergency}</div>`:''}
+<div class="sig"><div>Patient/Attender<br/>Signature</div><div>Dr. ${patient.resident}<br/>Resident Surgeon</div><div>Consultant<br/>Signature & Seal</div></div>
+<div class="ft">GMC Plastics PMS v5 · ${new Date().toLocaleString('en-IN')}</div></body></html>`);
+    w.document.close();w.focus();w.print();
+  };
+  return(
+    <div>
+      <div style={{...S.card,borderTop:`3px solid ${C.accent}`,marginBottom:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
+          <div style={{fontSize:14,fontWeight:800,color:C.t}}>📄 Discharge Summary</div>
+          <button onClick={print} style={S.btn("g")}>🖨️ Print / PDF</button>
+        </div>
+        <div style={S.g2}>
+          {[["Patient",patient.name],["IPD",patient.id],["Age/Gender",`${patient.age}y/${patient.gender}`],["Ward",patient.ward],["Admitted",patient.admitDate],["Diagnosis",patient.diagnosis]].map(([k,v])=>(
+            <div key={k} style={{padding:"6px 10px",background:C.bg,borderRadius:8,border:`1px solid ${C.b}`}}>
+              <div style={{fontSize:10,color:C.sub,textTransform:"uppercase"}}>{k}</div>
+              <div style={{fontSize:12,color:C.t,fontWeight:600,marginTop:1}}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={S.card}><Sect title="Clinical History" color={C.accent}><F label="Chief Complaint" k="chiefComplaint" rows={2}/><F label="History of Present Illness" k="history" rows={4}/><F label="Past History / Co-morbidities" k="pastHistory" rows={3}/></Sect></div>
+      <div style={S.card}><Sect title="Examination" color={C.accent}><F label="General + Local Examination" k="examination" rows={5}/></Sect></div>
+      <div style={S.card}><Sect title="Investigations" color={C.accent}><F label="Key Investigation Results" k="investigations" rows={5} hint="Hb: ___ WBC: ___ Plt: ___&#10;RFT: Urea ___ Creatinine ___&#10;Imaging: ..."/></Sect></div>
+      <div style={S.card}>
+        <Sect title="Treatment & Course" color={C.accent}>
+          <F label="Treatment Given" k="treatment" rows={4}/>
+          <F label="Procedure / Operation Details" k="procedure" rows={4} hint="Date: ___&#10;Procedure: ___&#10;Anaesthesia: GA/LA&#10;Findings: ..."/>
+          <div style={{padding:"8px 12px",background:C.bg,borderRadius:8,border:`1px solid ${C.b}`,marginBottom:14}}>
+            <div style={{fontSize:11,color:C.sub,marginBottom:5}}>Protocol post-op orders (auto-included in print):</div>
+            {(proto?.postop||[]).slice(0,5).map((item,i)=><div key={i} style={{fontSize:12,color:C.t,padding:"2px 0",borderBottom:`1px solid ${C.b}`}}>{i+1}. {item}</div>)}
+          </div>
+          <F label="Course in Hospital" k="course" rows={4} hint="D1: stable, flap pink...&#10;D5: wound healthy..."/>
+        </Sect>
+      </div>
+      <div style={S.card}>
+        <Sect title="Advice on Discharge" color={C.accent}>
+          <F label="Medications on Discharge" k="medications" rows={4} hint="1. Tab. Amoxicillin-Clav 625mg BD x5d&#10;2. Tab. Diclofenac 50mg SOS..."/>
+          <F label="Additional Advice / Wound Care" k="advice" rows={3}/>
+          <F label="Diet Advice" k="diet" rows={2}/>
+          <F label="Activity Restrictions" k="activity" rows={2}/>
+          <div style={S.g2}>
+            <div><Lbl t="Follow-Up Date"/><input type="date" style={S.inp} value={ds.followupDate||""} onChange={e=>upd("followupDate",e.target.value)}/></div>
+            <div><Lbl t="Emergency Contact"/><input style={S.inp} value={ds.emergency||""} onChange={e=>upd("emergency",e.target.value)} placeholder="Ward phone"/></div>
+          </div>
+          <Sp h={10}/>
+          <F label="Follow-Up Instructions" k="followup" rows={2}/>
+        </Sect>
+      </div>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+        <button onClick={print} style={S.btn("g")}>🖨️ Print Discharge Summary</button>
+        <button onClick={()=>{DB.setDS(patient.id,ds);alert("Saved!");}} style={S.btn("p")}>💾 Save Draft</button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// PATIENT DETAIL MODAL
+// ═══════════════════════════════════════════════════
+function PatDetail({patient,onClose,onUpdate,protos,user}){
+  const [tab,setTab]=useState("protocol");
+  const [orders,setOrders]=useState(()=>DB.getOrders(patient.id));
+  const [otxt,setOtxt]=useState(""); const [oby,setOby]=useState("Resident");
+  const [editing,setEditing]=useState(false);
+  const [inQ,setInQ]=useState(()=>LS.g('q_'+patient.id,false));
+  const proto=protos[patient.diagnosis];
+  useEffect(()=>DB.setOrders(patient.id,orders),[orders,patient.id]);
+  useEffect(()=>LS.s('q_'+patient.id,inQ),[inQ]);
+  const addOrder=()=>{if(!otxt.trim())return;setOrders(p=>[...p,{id:Date.now(),text:otxt.trim(),by:oby,time:new Date().toLocaleString('en-IN'),type:(oby.includes("Senior")||oby.includes("Consultant"))?"senior":"res"}]);setOtxt("");};
+  const pr=PRIO[patient.priority];
+  const TABS=[{id:"protocol",l:"📋 Protocol"},{id:"orders",l:`📝 Orders(${orders.length})`},{id:"discharge",l:"🏥 DC"}];
+  return(
+    <>
+    {editing&&<PatForm existing={patient} onSave={p=>{onUpdate(p);setEditing(false);}} onClose={()=>setEditing(false)} protos={protos}/>}
+    <div style={S.ovl}>
+      <div style={{...S.box(980)}} className="fi">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12,gap:8}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+              <span style={{fontSize:16,fontWeight:800,color:C.t}}>{patient.name}</span>
+              <span style={S.bdg(patient.priority)}>{pr.i} {patient.priority}</span>
+            </div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:2}}>{patient.id} · {patient.age}y/{patient.gender} · {patient.ward}</div>
+            <div style={{fontSize:13,color:proto?.color||C.accent,fontWeight:600}}>{patient.diagnosis}</div>
+          </div>
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
+            {patient.allInvestigationsDone&&!inQ&&<button onClick={()=>setInQ(true)} style={S.btn("g")}>+OT</button>}
+            {inQ&&<span style={S.pil("#22C55E","sm")}>✓OT</span>}
+            <button onClick={()=>setEditing(true)} style={S.btn("y")}>✏️</button>
+            <button onClick={onClose} style={S.btn()}>✕</button>
+          </div>
+        </div>
+        {patient.notes&&<div style={{padding:"6px 12px",background:C.bg,borderRadius:8,border:`1px solid ${C.b}`,marginBottom:10,fontSize:12,color:C.sub}}>{patient.notes.slice(0,120)}</div>}
+        <div style={{display:"flex",gap:3,marginBottom:14,borderBottom:`1px solid ${C.b}`,paddingBottom:8,overflowX:"auto"}}>
+          {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"8px 14px",borderRadius:8,border:"none",cursor:"pointer",background:tab===t.id?"#1D4ED8":"transparent",color:tab===t.id?"#fff":C.sub,fontSize:13,fontWeight:600,fontFamily:"inherit",whiteSpace:"nowrap"}}>{t.l}</button>)}
+        </div>
+        {tab==="protocol"&&<ProtPanel diagnosis={patient.diagnosis} patId={patient.id} protos={protos}/>}
+        {tab==="orders"&&(
+          <div>
+            <div style={S.card}>
+              <Lbl t="Add Order / Note"/>
+              <select style={{...S.sel,marginBottom:10}} value={oby} onChange={e=>setOby(e.target.value)}>
+                <option>Resident</option><option>Senior/Consultant</option><option>Anaesthesia</option><option>Allied Dept</option><option>Nursing</option>
+              </select>
+              <textarea style={S.ta} value={otxt} onChange={e=>setOtxt(e.target.value)} placeholder="Write order or clinical note..."/>
+              <Sp h={8}/><button onClick={addOrder} style={S.btn("p")}>Add Order</button>
+            </div>
+            {[...orders].reverse().map(o=>(
+              <div key={o.id} style={{...S.card,borderLeft:`3px solid ${o.type==="senior"?"#F59E0B":C.accent}`}}>
+                <div style={{fontSize:11,color:C.sub,marginBottom:4}}>{o.type==="senior"?"👨‍⚕️":"💊"} {o.by} · {o.time}</div>
+                <div style={{fontSize:13,color:C.t,lineHeight:1.5}}>{o.text}</div>
+              </div>
+            ))}
+            {orders.length===0&&<div style={{...S.card,textAlign:"center",padding:24,color:C.sub}}>No orders yet</div>}
+          </div>
+        )}
+        {tab==="discharge"&&<DSSummary patient={patient} proto={proto}/>}
+      </div>
+    </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// PATIENT FORM
+// ═══════════════════════════════════════════════════
+function PatForm({existing,onSave,onClose,protos}){
+  const [f,setF]=useState(existing||{name:"",age:"",gender:"Male",ward:WARDS[0],diagnosis:Object.keys(protos)[0],priority:"Urgent",resident:"",contact:"",refType:"Ward",notes:"",status:"Pre-Op Workup",allInvestigationsDone:false});
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+  return(
+    <div style={S.ovl}>
+      <div style={S.box(800)} className="fi">
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+          <div style={{fontSize:15,fontWeight:800,color:C.t}}>{existing?"Edit Patient":"Add New Patient"}</div>
+          <button onClick={onClose} style={S.btn()}>✕</button>
+        </div>
+        <div style={S.g2}>
+          <div><Lbl t="Full Name *"/><input style={S.inp} value={f.name} onChange={e=>u("name",e.target.value)} placeholder="Patient name"/></div>
+          <div><Lbl t="Age"/><input style={S.inp} type="number" value={f.age} onChange={e=>u("age",e.target.value)}/></div>
+          <div><Lbl t="Gender"/><select style={S.sel} value={f.gender} onChange={e=>u("gender",e.target.value)}><option>Male</option><option>Female</option><option>Other</option></select></div>
+          <div><Lbl t="Contact"/><input style={S.inp} value={f.contact} onChange={e=>u("contact",e.target.value)} placeholder="Mobile"/></div>
+          <div><Lbl t="Ward"/><select style={S.sel} value={f.ward} onChange={e=>u("ward",e.target.value)}>{WARDS.map(w=><option key={w}>{w}</option>)}</select></div>
+          <div><Lbl t="Priority"/><select style={S.sel} value={f.priority} onChange={e=>u("priority",e.target.value)}>{Object.keys(PRIO).map(p=><option key={p}>{p}</option>)}</select></div>
+          <div><Lbl t="Patient Type"/><select style={S.sel} value={f.refType} onChange={e=>u("refType",e.target.value)}><option value="Ward">Ward Patient</option><option value="Reference">Inter-Dept Ref</option><option value="OPD">OPD</option></select></div>
+          <div><Lbl t="Resident"/><input style={S.inp} value={f.resident} onChange={e=>u("resident",e.target.value)} placeholder="Dr. Name"/></div>
+          <div style={{gridColumn:"1/-1"}}><Lbl t="Diagnosis"/>
+            <select style={S.sel} value={f.diagnosis} onChange={e=>u("diagnosis",e.target.value)}>{Object.keys(protos).map(d=><option key={d}>{d}</option>)}</select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}><Lbl t="Status"/>
+            <select style={S.sel} value={f.status} onChange={e=>u("status",e.target.value)}>{["Pre-Op Workup","Active Management","Cleared for OT","Post-Op","Discharged"].map(s=><option key={s}>{s}</option>)}</select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}><Lbl t="Clinical Notes"/>
+            <textarea style={S.ta} value={f.notes} onChange={e=>u("notes",e.target.value)} placeholder="Mechanism, clinical description..."/>
+          </div>
+          <div style={{gridColumn:"1/-1",display:"flex",alignItems:"center",gap:10}}>
+            <CB chk={f.allInvestigationsDone} on={()=>u("allInvestigationsDone",!f.allInvestigationsDone)}/>
+            <span style={{fontSize:13,color:C.t}}>All investigations done — cleared for OT</span>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:16}}>
+          <button onClick={onClose} style={S.btn()}>Cancel</button>
+          <button onClick={()=>{if(!f.name.trim())return alert("Name required");const id=existing?.id||`GMC-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}`;onSave({...f,id,created_at:existing?.created_at||new Date().toISOString(),admitDate:existing?.admitDate||new Date().toISOString().split("T")[0]});}} style={S.btn("g")}>💾 {existing?"Update":"Add Patient"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// REFERENCE PORTAL — full portal for other depts
+// ═══════════════════════════════════════════════════
+function RefPortal({protos,allPts,onSubmit,onUpdate}){
+  const [mode,setMode]=useState("home"); // home | new | revisit
+  const [refId,setRefId]=useState("");
+  const [foundPt,setFoundPt]=useState(null);
+  const [notFound,setNotFound]=useState(false);
+
+  // New reference form state
+  const [f,setF]=useState({name:"",age:"",gender:"Male",ward:"",contact:"",diagnosis:Object.keys(protos)[0],priority:"Semi-Urgent",notes:"",refDept:"",refDoctorName:"",refType:"Reference"});
+  const [done,setDone]=useState(null);
+  const [busy,setBusy]=useState(false);
+  const u=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const submit=async()=>{
+    if(!f.name.trim()||!f.refDept.trim())return alert("Patient name and department required");
+    setBusy(true);
+    const id=`REF-${new Date().getFullYear()}-${String(Math.floor(Math.random()*9000)+1000)}`;
+    const pt={...f,id,created_at:new Date().toISOString(),admitDate:new Date().toISOString().split("T")[0],status:"Pre-Op Workup",allInvestigationsDone:false,resident:""};
+    await onSubmit(pt);
+    setBusy(false);
+    setDone(id);
+  };
+
+  const findPatient=()=>{
+    const id=refId.trim().toUpperCase();
+    const pt=allPts.find(p=>p.id.toUpperCase()===id||p.id.toUpperCase().includes(id));
+    if(pt){setFoundPt(pt);setNotFound(false);}
+    else{setFoundPt(null);setNotFound(true);}
+  };
+
+  // REVISIT VIEW — other dept can see patient + add investigations
+  if(mode==="revisit"&&foundPt){
+    return <RefPatientView patient={foundPt} protos={protos} onBack={()=>{setMode("home");setFoundPt(null);setRefId("");}} onUpdate={onUpdate}/>;
+  }
+
+  if(done) return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{...S.card,maxWidth:460,textAlign:"center",padding:44}} className="fi">
+        <div style={{fontSize:52,marginBottom:14}}>✅</div>
+        <div style={{fontSize:18,fontWeight:800,color:"#22C55E",marginBottom:8}}>Reference Submitted!</div>
+        <div style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:20}}>Patient <strong style={{color:C.t}}>{f.name}</strong> has been sent to Plastics team.</div>
+        <div style={{padding:"12px 16px",background:"rgba(59,130,246,0.1)",borderRadius:10,border:`1px solid ${C.accent}30`,marginBottom:20}}>
+          <div style={{fontSize:12,color:C.sub,marginBottom:4}}>REFERENCE ID (save this to revisit)</div>
+          <div style={{fontSize:20,fontWeight:800,color:C.accent,letterSpacing:"2px"}}>{done}</div>
+        </div>
+        <div style={{fontSize:12,color:C.mu,marginBottom:20}}>Use this ID to revisit and upload investigation reports</div>
+        <button onClick={()=>{setDone(null);setF({name:"",age:"",gender:"Male",ward:"",contact:"",diagnosis:Object.keys(protos)[0],priority:"Semi-Urgent",notes:"",refDept:"",refDoctorName:"",refType:"Reference"});setMode("home");}} style={S.btn("p",true)}>Done</button>
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,padding:"20px 16px"}}>
+      <div style={{maxWidth:620,margin:"0 auto"}}>
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:12,padding:"14px 20px",background:C.panel,borderRadius:14,border:`1px solid ${C.b}`,marginBottom:14}}>
+            <span style={{fontSize:26}}>🏥</span>
+            <div>
+              <div style={{fontSize:16,fontWeight:800,color:C.t,fontFamily:"Syne"}}>GMC Plastic Surgery</div>
+              <div style={{fontSize:12,color:C.sub}}>Inter-Department Reference Portal</div>
+            </div>
+          </div>
+          <div style={{fontSize:12,color:C.mu}}>Grant Medical College & Hospital, Mumbai</div>
+        </div>
+
+        {mode==="home"&&(
+          <div className="fi">
+            <div style={{...S.g2,marginBottom:14}}>
+              <button onClick={()=>setMode("new")} style={{...S.card,border:`2px solid ${C.accent}30`,cursor:"pointer",textAlign:"center",padding:24,background:`${C.accent}08`}}>
+                <div style={{fontSize:32,marginBottom:8}}>📤</div>
+                <div style={{fontWeight:700,color:C.t,fontSize:15}}>New Reference</div>
+                <div style={{fontSize:12,color:C.sub,marginTop:4}}>Send a patient to Plastics</div>
+              </button>
+              <button onClick={()=>setMode("revisit")} style={{...S.card,border:`2px solid ${C.teal}30`,cursor:"pointer",textAlign:"center",padding:24,background:`${C.teal}08`}}>
+                <div style={{fontSize:32,marginBottom:8}}>🔍</div>
+                <div style={{fontWeight:700,color:C.t,fontSize:15}}>Revisit Reference</div>
+                <div style={{fontSize:12,color:C.sub,marginTop:4}}>Upload reports & updates</div>
+              </button>
+            </div>
+            <div style={{...S.card,padding:16}}>
+              <div style={{fontSize:12,color:C.sub,textAlign:"center"}}>Use your Reference ID to track patient status and add investigation results</div>
+            </div>
+          </div>
+        )}
+
+        {mode==="revisit"&&!foundPt&&(
+          <div className="fi">
+            <div style={S.card}>
+              <div style={{fontSize:14,fontWeight:700,color:C.t,marginBottom:14}}>🔍 Find Your Reference</div>
+              <Lbl t="Enter Reference ID"/>
+              <input style={{...S.inp,marginBottom:12}} value={refId} onChange={e=>setRefId(e.target.value)} placeholder="e.g. REF-2024-1234" onKeyDown={e=>e.key==="Enter"&&findPatient()}/>
+              {notFound&&<div style={{padding:"8px 12px",background:"rgba(239,68,68,0.1)",borderRadius:8,color:"#EF4444",fontSize:13,marginBottom:12}}>⚠️ No patient found with this ID. Check the ID and try again.</div>}
+              <div style={{display:"flex",gap:10}}>
+                <button onClick={findPatient} style={S.btn("p")}>Find Patient</button>
+                <button onClick={()=>setMode("home")} style={S.btn()}>← Back</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {mode==="new"&&(
+          <div className="fi">
+            <div style={S.card}>
+              <div style={{fontSize:14,fontWeight:700,color:C.t,marginBottom:14}}>Referring Department</div>
+              <div style={S.g2}>
+                <div><Lbl t="Department *"/><input style={S.inp} value={f.refDept} onChange={e=>u("refDept",e.target.value)} placeholder="ENT, Ortho, Medicine..."/></div>
+                <div><Lbl t="Referring Doctor *"/><input style={S.inp} value={f.refDoctorName} onChange={e=>u("refDoctorName",e.target.value)} placeholder="Dr. Sharma"/></div>
+              </div>
+            </div>
+            <div style={S.card}>
+              <div style={{fontSize:14,fontWeight:700,color:C.t,marginBottom:14}}>Patient Details</div>
+              <div style={S.g2}>
+                <div><Lbl t="Patient Name *"/><input style={S.inp} value={f.name} onChange={e=>u("name",e.target.value)}/></div>
+                <div><Lbl t="Age"/><input style={S.inp} type="number" value={f.age} onChange={e=>u("age",e.target.value)}/></div>
+                <div><Lbl t="Gender"/><select style={S.sel} value={f.gender} onChange={e=>u("gender",e.target.value)}><option>Male</option><option>Female</option><option>Other</option></select></div>
+                <div><Lbl t="Contact"/><input style={S.inp} value={f.contact} onChange={e=>u("contact",e.target.value)}/></div>
+                <div><Lbl t="Current Ward / Bed"/><input style={S.inp} value={f.ward} onChange={e=>u("ward",e.target.value)} placeholder="Ward 5B Bed 12"/></div>
+                <div><Lbl t="Priority"/><select style={S.sel} value={f.priority} onChange={e=>u("priority",e.target.value)}>{Object.keys(PRIO).map(p=><option key={p}>{p}</option>)}</select></div>
+                <div style={{gridColumn:"1/-1"}}><Lbl t="Reason / Diagnosis"/>
+                  <select style={S.sel} value={f.diagnosis} onChange={e=>u("diagnosis",e.target.value)}>{Object.keys(protos).map(d=><option key={d}>{d}</option>)}</select>
+                </div>
+                <div style={{gridColumn:"1/-1"}}><Lbl t="Clinical Notes / Reason for Reference"/>
+                  <textarea style={{...S.ta,minHeight:90}} value={f.notes} onChange={e=>u("notes",e.target.value)} placeholder="Clinical details, what opinion is needed, urgency, relevant history..."/>
+                </div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={submit} disabled={busy} style={S.btn("g",true)}>
+                {busy?<span className="sp"/>:"📤 Submit Reference"}
+              </button>
+            </div>
+            <Sp h={10}/>
+            <button onClick={()=>setMode("home")} style={S.btn("",true)}>← Back</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Revisit view — referring dept can see status + upload investigations
+function RefPatientView({patient,protos,onBack,onUpdate}){
+  const [photos,setPhotos]=useState(()=>DB.getPhotos(patient.id));
+  const [chks,setChks]=useState(()=>DB.getChks(patient.id));
+  const [notes,setNotes]=useState("");
+  const [saved,setSaved]=useState(false);
+  useEffect(()=>DB.setPhotos(patient.id,photos),[photos,patient.id]);
+  useEffect(()=>DB.setChks(patient.id,chks),[chks,patient.id]);
+  const addPhoto=(key,ph)=>setPhotos(p=>({...p,[key]:[...(p[key]||[]),ph]}));
+  const tog=k=>setChks(p=>({...p,[k]:!p[k]}));
+  const proto=protos[patient.diagnosis];
+  const pr=PRIO[patient.priority];
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,padding:"20px 16px"}}>
+      <div style={{maxWidth:680,margin:"0 auto"}}>
+        <button onClick={onBack} style={{...S.btn("sm"),marginBottom:14}}>← Back</button>
+        <div style={{...S.card,borderLeft:`4px solid ${pr.c}`,marginBottom:16}}>
+          <div style={{fontWeight:800,fontSize:16,color:C.t,marginBottom:4}}>{patient.name}</div>
+          <div style={{fontSize:12,color:C.sub,marginBottom:4}}>{patient.id} · {patient.age}y/{patient.gender}</div>
+          <div style={{fontSize:13,color:proto?.color||C.accent,fontWeight:600,marginBottom:6}}>{patient.diagnosis}</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <span style={S.bdg(patient.priority)}>{pr.i} {patient.priority}</span>
+            <span style={S.pil(patient.status==="Cleared for OT"?"#22C55E":C.warn,"sm")}>{patient.status}</span>
+          </div>
+        </div>
+        <div style={{...S.card,background:"rgba(59,130,246,0.06)",border:`1px solid ${C.accent}25`,marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:700,color:C.accent,marginBottom:10}}>📋 Investigation Checklist</div>
+          <div style={{fontSize:12,color:C.sub,marginBottom:12}}>Tick investigations done and upload reports:</div>
+          {(proto?.investigations||[]).map((item,i)=>(
+            <InvRow key={i} item={item} idx={i} patId={patient.id} checked={!!chks['inv_'+i]} onChk={tog} photos={photos} onAddPhoto={addPhoto} readOnly={false}/>
+          ))}
+        </div>
+        <div style={S.card}>
+          <div style={{fontSize:13,fontWeight:700,color:C.t,marginBottom:10}}>📝 Add Note / Update</div>
+          <textarea style={{...S.ta,marginBottom:10}} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Any clinical updates, new findings, urgency change..."/>
+          <button onClick={()=>{if(!notes.trim())return;const orders=DB.getOrders(patient.id);DB.setOrders(patient.id,[...orders,{id:Date.now(),text:notes,by:`${patient.refDept||"Referring Dept"} - ${patient.refDoctorName||"Dr."}`,time:new Date().toLocaleString('en-IN'),type:"res"}]);setNotes("");setSaved(true);setTimeout(()=>setSaved(false),2000);}} style={S.btn("p")}>
+            Add Update
+          </button>
+          {saved&&<span style={{...S.pil("#22C55E","sm"),marginLeft:10}}>✓ Saved</span>}
+        </div>
+        <div style={{...S.card,background:"rgba(34,197,94,0.05)",border:"1px solid #22C55E25"}}>
+          <div style={{fontSize:12,color:"#22C55E",fontWeight:600}}>ℹ️ Updates visible to Plastics team immediately</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// PROTOCOL MANAGER
+// ═══════════════════════════════════════════════════
+function ProtoManager({protos,onSave}){
+  const [cat,setCat]=useState("All");
+  const [editing,setEditing]=useState(null);
+  const [showNew,setShowNew]=useState(false);
+  const CATS=["All","Trauma","Reconstruction","Oncoplastic","Vascular","Burns & Contracture","Aesthetic & Body","Congenital","Custom"];
+  const SE=({proto,setProto,k,label,icon})=>{
+    const [txt,setTxt]=useState(""); const items=proto[k]||[];
+    const add=()=>{if(!txt.trim())return;setProto(p=>({...p,[k]:[...(p[k]||[]),txt.trim()]}));setTxt("");};
+    const rm=i=>setProto(p=>({...p,[k]:items.filter((_,j)=>j!==i)}));
+    return(
+      <div style={{marginBottom:14}}>
+        <div style={{fontSize:11,fontWeight:700,color:C.accent,marginBottom:6,textTransform:"uppercase"}}>{icon} {label}</div>
+        {items.map((item,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:4,background:C.bg,padding:"6px 10px",borderRadius:8,border:`1px solid ${C.b}`,alignItems:"center"}}><span style={{flex:1,fontSize:12,color:C.t}}>{item}</span><button onClick={()=>rm(i)} style={{...S.btn("r"),padding:"2px 8px",fontSize:10}}>✕</button></div>)}
+        <div style={{display:"flex",gap:8}}><input style={{...S.inp,flex:1}} value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()} placeholder="Add item and press Enter"/><button onClick={add} style={S.btn("p")}>+</button></div>
+      </div>
+    );
+  };
+  const EM=({proto,name,onSv,onClose})=>{
+    const [p,setP]=useState({...proto}); const [n,setN]=useState(name);
+    return(
+      <div style={S.ovl}><div style={{...S.box(900)}} className="fi">
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:14}}><div style={{fontSize:15,fontWeight:800,color:C.t}}>{name?"Edit":"New"} Protocol</div><button onClick={onClose} style={S.btn()}>✕</button></div>
+        <div style={S.g2}>
+          <div><Lbl t="Name"/><input style={S.inp} value={n} onChange={e=>setN(e.target.value)}/></div>
+          <div><Lbl t="Category"/><select style={S.sel} value={p.category||"Custom"} onChange={e=>setP(x=>({...x,category:e.target.value}))}>{CATS.filter(c=>c!=="All").map(c=><option key={c}>{c}</option>)}</select></div>
+        </div>
+        <Sp h={8}/><Lbl t="Colour"/><input type="color" style={{...S.inp,height:44,padding:4,marginBottom:14}} value={p.color||"#3B82F6"} onChange={e=>setP(x=>({...x,color:e.target.value}))}/>
+        <div style={S.dv}/>
+        <div style={{maxHeight:480,overflowY:"auto",paddingRight:4}}>
+          <SE proto={p} setProto={setP} k="investigations" label="Investigations" icon="🧪"/>
+          <SE proto={p} setProto={setP} k="preop_checklist" label="Pre-Op Checklist" icon="✅"/>
+          <SE proto={p} setProto={setP} k="preop_orders" label="Pre-Op Orders" icon="📝"/>
+          <SE proto={p} setProto={setP} k="special_consent" label="Special Consent" icon="⚖️"/>
+          <SE proto={p} setProto={setP} k="materials" label="Materials & Equipment" icon="🛒"/>
+          <SE proto={p} setProto={setP} k="intraop" label="Intra-Op" icon="🔪"/>
+          <SE proto={p} setProto={setP} k="postop" label="Post-Op Orders" icon="💊"/>
+          <SE proto={p} setProto={setP} k="references" label="References" icon="📚"/>
+        </div>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:14}}>
+          <button onClick={onClose} style={S.btn()}>Cancel</button>
+          <button onClick={()=>{if(!n.trim())return alert("Name required");onSv(n,p);onClose();}} style={S.btn("g")}>💾 Save</button>
+        </div>
+      </div></div>
+    );
+  };
+  const filt=Object.entries(protos).filter(([,v])=>cat==="All"||v.category===cat);
+  return(
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <div style={{fontSize:18,fontWeight:800,color:C.t}}>Protocol Manager</div>
+        <button onClick={()=>setShowNew(true)} style={S.btn("p")}>+ New</button>
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+        {CATS.map(c=><button key={c} onClick={()=>setCat(c)} style={{...S.btn(cat===c?"p":""),padding:"5px 12px",fontSize:12}}>{c}</button>)}
+      </div>
+      <div style={S.g2}>
+        {filt.map(([name,proto])=>(
+          <div key={name} style={{...S.card,borderLeft:`4px solid ${proto.color||C.accent}`}}>
+            <div style={{fontWeight:700,color:C.t,fontSize:13,marginBottom:4}}>{name}</div>
+            <span style={{padding:"2px 8px",borderRadius:4,fontSize:11,fontWeight:600,background:`${proto.color||C.accent}18`,color:proto.color||C.accent,border:`1px solid ${proto.color||C.accent}25`}}>{proto.category}</span>
+            <div style={{fontSize:11,color:C.sub,marginTop:6}}>{(proto.investigations||[]).length} inv · {(proto.materials||[]).length} mat · {(proto.special_consent||[]).length} consent</div>
+            <div style={{display:"flex",gap:6,marginTop:10}}>
+              <button onClick={()=>setEditing(name)} style={{...S.btn("p"),padding:"4px 12px",fontSize:12}}>✏️ Edit</button>
+              <button onClick={()=>{if(window.confirm(`Delete "${name}"?`)){const u={...protos};delete u[name];onSave(u);}}} style={{...S.btn("r"),padding:"4px 10px",fontSize:12}}>🗑️</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {editing&&<EM proto={protos[editing]} name={editing} onSv={(n,p)=>{const u={...protos};if(n!==editing)delete u[editing];u[n]=p;onSave(u);setEditing(null);}} onClose={()=>setEditing(null)}/>}
+      {showNew&&<EM proto={{name:"",category:"Custom",color:"#3B82F6",investigations:[],preop_checklist:[],preop_orders:[],special_consent:[],materials:[],intraop:[],postop:[],references:[]}} name="" onSv={(n,p)=>{onSave({...protos,[n]:p});setShowNew(false);}} onClose={()=>setShowNew(false)}/>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// PATIENT CARD
+// ═══════════════════════════════════════════════════
+function PatCard({patient,onClick,onDel,protos}){
+  const pr=PRIO[patient.priority];
+  const proto=protos[patient.diagnosis];
+  return(
+    <div onClick={()=>onClick(patient)} style={{...S.card,cursor:"pointer",borderLeft:`4px solid ${pr.c}`}} className="fi">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap",marginBottom:4}}>
+            <span style={{fontSize:15,fontWeight:800,color:C.t}}>{patient.name}</span>
+            <span style={S.bdg(patient.priority)}>{pr.i} {patient.priority}</span>
+            {patient.allInvestigationsDone&&<span style={S.pil("#22C55E","sm")}>✓</span>}
+          </div>
+          <div style={{fontSize:12,color:C.sub,marginBottom:3}}>{patient.age}y/{patient.gender} · {patient.ward}</div>
+          <div style={{fontSize:13,color:proto?.color||C.accent,fontWeight:600}}>{patient.diagnosis}</div>
+          {patient.refType==="Reference"&&<div style={{fontSize:11,color:"#A855F7",marginTop:3}}>📨 {patient.refDept} — Dr. {patient.refDoctorName||"—"}</div>}
+        </div>
+        <div style={{textAlign:"right",flexShrink:0}}>
+          <div style={S.pil(patient.status==="Cleared for OT"?"#22C55E":patient.status==="Post-Op"?"#3B82F6":C.warn,"sm")}>{patient.status}</div>
+          <div style={{fontSize:11,color:C.sub,marginTop:4}}>Dr. {patient.resident||"—"}</div>
+          <div style={{fontSize:11,color:C.mu}}>{patient.admitDate}</div>
+          <button onClick={e=>{e.stopPropagation();if(window.confirm("Delete patient?"))onDel(patient.id);}} style={{...S.btn("r"),padding:"2px 8px",fontSize:10,marginTop:6}}>Delete</button>
+        </div>
+      </div>
+      {patient.notes&&<div style={{marginTop:7,fontSize:11,color:C.mu,borderTop:`1px solid ${C.b}`,paddingTop:6,lineHeight:1.4}}>{patient.notes.slice(0,100)}{patient.notes.length>100?"...":""}</div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════
+function App(){
+  const [user,setUser]=useState(()=>{
+    const s=LS.g('gmc_session',null);
+    if(s&&Date.now()-s.ts<86400000*7)return s;
+    return null;
+  });
+  const [view,setView]=useState("dashboard");
+  const [pts,setPts]=useState([]);
+  const [protos,setProtos]=useState(DP);
+  const [loading,setLoading]=useState(true);
+  const [sel,setSel]=useState(null);
+  const [showAdd,setShowAdd]=useState(false);
+  const [navOpen,setNavOpen]=useState(false);
+  const [search,setSearch]=useState("");
+  const [wf,setWf]=useState("All");
+  const [pf,setPf]=useState("All");
+
+  const isRef=window.location.hash==="#refer";
+
+  useEffect(()=>{
+    (async()=>{
+      const[p,pr]=await Promise.all([DB.getPts(),DB.getProtos()]);
+      setPts(p);setProtos(pr);setLoading(false);
+    })();
+  },[]);
+
+  const addPt=async p=>{await DB.savePt(p);setPts(prev=>[p,...prev.filter(x=>x.id!==p.id)]);};
+  const updPt=async p=>{await DB.savePt(p);setPts(prev=>prev.map(x=>x.id===p.id?p:x));};
+  const delPt=async id=>{await DB.delPt(id);setPts(prev=>prev.filter(x=>x.id!==id));};
+  const saveProtos=async pr=>{setProtos(pr);await DB.saveProtos(pr);};
+  const logout=()=>{LS.s('gmc_session',null);setUser(null);setNavOpen(false);};
+
+  // Public reference portal
+  if(isRef)return<RefPortal protos={protos} allPts={pts} onSubmit={addPt} onUpdate={updPt}/>;
+
+  // Login wall
+  if(!user)return<LoginPage onLogin={setUser}/>;
+
+  if(loading)return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",flexDirection:"column",gap:14}}>
+      <div className="sp" style={{width:36,height:36,border:"3px solid #1E3A5F",borderTopColor:C.accent,borderRadius:"50%"}}></div>
+      <div style={{color:C.sub}}>Loading...</div>
+    </div>
+  );
+
+  const filt=pts.filter(p=>{
+    const s=search.toLowerCase();
+    return(!s||p.name.toLowerCase().includes(s)||p.id.toLowerCase().includes(s)||p.diagnosis.toLowerCase().includes(s)||(p.resident||"").toLowerCase().includes(s))
+      &&(wf==="All"||p.ward===wf)&&(pf==="All"||p.priority===pf);
+  });
+  const wardPts=filt.filter(p=>p.refType!=="Reference");
+  const refPts=filt.filter(p=>p.refType==="Reference");
+  const qPts=pts.filter(p=>p.allInvestigationsDone||LS.g('q_'+p.id,false));
+  const shareUrl=`${window.location.href.split('#')[0]}#refer`;
+
+  const NAV=[
+    {id:"dashboard",icon:"🏠",label:"Dashboard"},
+    {id:"ward",icon:"🛏️",label:"Ward Patients",cnt:pts.filter(p=>p.refType!=="Reference").length},
+    {id:"references",icon:"📨",label:"References",cnt:refPts.length},
+    {id:"otqueue",icon:"🏥",label:"OT Queue",cnt:qPts.length},
+    {id:"protocols",icon:"📋",label:"Protocols"},
+  ];
+
+  const navTo=(id)=>{setView(id);setNavOpen(false);};
+
+  const SC=({value,label,color,icon})=>(
+    <div style={{background:C.card,border:`1px solid ${C.b}`,borderRadius:12,padding:"14px 16px",borderTop:`3px solid ${color}`}}>
+      <div style={{fontSize:24,fontWeight:800,color:C.t}}>{value}</div>
+      <div style={{fontSize:11,color:C.sub,marginTop:3,textTransform:"uppercase"}}>{icon} {label}</div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg}}>
+
+      {/* ── TOP BAR (mobile-first) ── */}
+      <div style={{position:"sticky",top:0,zIndex:150,background:C.panel,borderBottom:`1px solid ${C.b}`,padding:"0 16px",height:56,display:"flex",alignItems:"center",gap:12}}>
+        {/* Hamburger */}
+        <button onClick={()=>setNavOpen(!navOpen)} style={{background:"transparent",border:`1px solid ${C.b}`,borderRadius:8,width:40,height:40,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,flexShrink:0}}>
+          <div style={{width:18,height:2,background:navOpen?C.accent:C.t,borderRadius:2,transition:"all 0.2s",transform:navOpen?"rotate(45deg) translate(5px,5px)":"none"}}></div>
+          <div style={{width:18,height:2,background:navOpen?C.accent:C.t,borderRadius:2,transition:"all 0.2s",opacity:navOpen?0:1}}></div>
+          <div style={{width:18,height:2,background:navOpen?C.accent:C.t,borderRadius:2,transition:"all 0.2s",transform:navOpen?"rotate(-45deg) translate(5px,-5px)":"none"}}></div>
+        </button>
+
+        {/* Title */}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:15,fontWeight:800,color:C.t,fontFamily:"Syne",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+            {NAV.find(n=>n.id===view)?.icon} {NAV.find(n=>n.id===view)?.label||"GMC Plastics"}
+          </div>
+        </div>
+
+        {/* Search (compact) */}
+        <input style={{...S.inp,width:160,fontSize:13,padding:"7px 12px"}} placeholder="🔍 Search..." value={search} onChange={e=>setSearch(e.target.value)} className="hide-mobile"/>
+
+        {/* Add button */}
+        <button onClick={()=>setShowAdd(true)} style={{...S.btn("p"),padding:"8px 14px",fontSize:13,flexShrink:0}}>➕</button>
+
+        {/* User */}
+        <div style={{fontSize:11,color:C.sub,flexShrink:0,cursor:"pointer"}} onClick={logout} title="Tap to logout">
+          👤 {user.name.split(" ")[0]}
+        </div>
+      </div>
+
+      {/* ── SLIDE-OUT NAV ── */}
+      {navOpen&&(
+        <>
+          <div onClick={()=>setNavOpen(false)} style={{position:"fixed",top:56,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:140}}/>
+          <div style={{position:"fixed",top:56,left:0,bottom:0,width:260,background:C.panel,borderRight:`1px solid ${C.b}`,zIndex:145,display:"flex",flexDirection:"column"}} className="si">
+            <div style={{padding:"8px 0",flex:1,overflowY:"auto"}}>
+              {NAV.map(item=>(
+                <div key={item.id} style={{...S.nav(view===item.id),padding:"13px 20px"}} onClick={()=>navTo(item.id)}>
+                  <span style={{fontSize:18}}>{item.icon}</span>
+                  <span style={{flex:1,fontSize:14}}>{item.label}</span>
+                  {item.cnt!==undefined&&<span style={{background:view===item.id?C.accent:C.card,color:"#fff",borderRadius:10,padding:"2px 8px",fontSize:12,fontWeight:700,border:`1px solid ${C.b}`}}>{item.cnt}</span>}
+                </div>
+              ))}
+            </div>
+            <div style={{padding:"16px 20px",borderTop:`1px solid ${C.b}`}}>
+              <div style={{fontSize:11,color:C.mu,marginBottom:4}}>Signed in as</div>
+              <div style={{fontSize:13,fontWeight:600,color:C.t,marginBottom:2}}>Dr. {user.name}</div>
+              <div style={{fontSize:11,color:C.sub,marginBottom:12}}>{user.role}</div>
+              <button onClick={logout} style={{...S.btn("r"),width:"100%",fontSize:13}}>🚪 Sign Out</button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── MAIN CONTENT ── */}
+      <div style={{padding:"16px 16px",maxWidth:980,margin:"0 auto"}}>
+
+        {/* Mobile search */}
+        <div style={{marginBottom:14,display:"flex",gap:8,flexWrap:"wrap"}}>
+          <input style={{...S.inp,flex:1,minWidth:140}} placeholder="🔍 Search name, ID, diagnosis..." value={search} onChange={e=>setSearch(e.target.value)}/>
+          <select style={{...S.sel,width:130}} value={wf} onChange={e=>setWf(e.target.value)}>
+            <option value="All">All Wards</option>{WARDS.map(w=><option key={w}>{w}</option>)}
+          </select>
+          <select style={{...S.sel,width:130}} value={pf} onChange={e=>setPf(e.target.value)}>
+            <option value="All">All Priority</option>{Object.keys(PRIO).map(p=><option key={p}>{p}</option>)}
+          </select>
+        </div>
+
+        {/* ── DASHBOARD ── */}
+        {view==="dashboard"&&(
+          <div>
+            <div style={{fontSize:18,fontWeight:800,color:C.t,marginBottom:3,fontFamily:"Syne"}}>Dashboard</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:16}}>Dept. of Plastic & Reconstructive Surgery · GMC Mumbai</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+              <SC value={pts.length} label="Total" color={C.accent} icon="🛏️"/>
+              <SC value={pts.filter(p=>p.priority==="Emergency").length} label="Emergency" color="#EF4444" icon="🚨"/>
+              <SC value={qPts.length} label="OT Ready" color="#22C55E" icon="✅"/>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+              <SC value={pts.filter(p=>p.priority==="Urgent").length} label="Urgent" color="#FF7043" icon="⚡"/>
+              <SC value={refPts.length} label="References" color="#A855F7" icon="📨"/>
+              <SC value={Object.keys(protos).length} label="Protocols" color={C.teal} icon="📋"/>
+            </div>
+            <div style={S.card}>
+              <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:12,textTransform:"uppercase"}}>📤 Reference Link</div>
+              <div style={{fontSize:12,color:C.sub,marginBottom:10}}>Share with ENT, Ortho, Medicine etc. They fill the form and it appears in References automatically.</div>
+              <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+                <input style={{...S.inp,flex:1,minWidth:180,fontSize:12}} readOnly value={shareUrl}/>
+                <button onClick={()=>{navigator.clipboard?.writeText(shareUrl).then(()=>alert("✅ Copied!"));}} style={S.btn("p")}>Copy</button>
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                <button onClick={()=>window.open(shareUrl,"_blank")} style={{...S.btn(),fontSize:12}}>🔗 Preview</button>
+                <button onClick={()=>window.open("https://wa.me/?text="+encodeURIComponent("GMC Plastic Surgery Reference Form:\n"+shareUrl),"_blank")} style={{...S.btn(),background:"#25D366",fontSize:12}}>📲 WhatsApp</button>
+              </div>
+            </div>
+            <div style={S.card}>
+              <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:10,textTransform:"uppercase"}}>Recent Patients</div>
+              {pts.slice(0,5).map(p=>(
+                <div key={p.id} onClick={()=>setSel(p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:`1px solid ${C.b}`,cursor:"pointer",gap:8}}>
+                  <div style={{flex:1,minWidth:0}}><span style={{fontWeight:600,color:C.t}}>{p.name}</span><div style={{fontSize:11,color:C.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.diagnosis}</div></div>
+                  <span style={S.bdg(p.priority)}>{p.priority}</span>
+                </div>
+              ))}
+              {pts.length===0&&<div style={{color:C.sub,fontSize:13,textAlign:"center",padding:20}}>No patients — tap ➕ to add</div>}
+            </div>
+          </div>
+        )}
+
+        {/* ── WARD ── */}
+        {view==="ward"&&(
+          <div>
+            <div style={{fontSize:18,fontWeight:800,color:C.t,marginBottom:3,fontFamily:"Syne"}}>Ward Patients</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:14}}>{wardPts.length} patient(s)</div>
+            {wardPts.length===0
+              ?<div style={{...S.card,textAlign:"center",padding:56,color:C.sub}}><div style={{fontSize:40}}>🛏️</div><Sp h={12}/>No patients — tap ➕ to add</div>
+              :wardPts.map(p=><PatCard key={p.id} patient={p} onClick={setSel} onDel={delPt} protos={protos}/>)}
+          </div>
+        )}
+
+        {/* ── REFERENCES ── */}
+        {view==="references"&&(
+          <div>
+            <div style={{fontSize:18,fontWeight:800,color:C.t,marginBottom:3,fontFamily:"Syne"}}>References</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:14}}>From other departments</div>
+            <div style={{...S.card,background:`${C.accent}08`,border:`1px solid ${C.accent}25`,marginBottom:14}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.accent,marginBottom:8}}>📤 Shareable Link</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+                <input style={{...S.inp,flex:1,minWidth:140,fontSize:11}} readOnly value={shareUrl}/>
+                <button onClick={()=>{navigator.clipboard?.writeText(shareUrl).then(()=>alert("✅ Copied!"));}} style={S.btn("p")}>Copy</button>
+                <button onClick={()=>window.open("https://wa.me/?text="+encodeURIComponent("GMC Plastic Surgery Reference Form:\n"+shareUrl),"_blank")} style={{...S.btn(),background:"#25D366"}}>📲</button>
+              </div>
+            </div>
+            {refPts.length===0
+              ?<div style={{...S.card,textAlign:"center",padding:40,color:C.sub}}><div style={{fontSize:36}}>📩</div><Sp h={10}/>No references yet</div>
+              :refPts.map(p=><PatCard key={p.id} patient={p} onClick={setSel} onDel={delPt} protos={protos}/>)}
+          </div>
+        )}
+
+        {/* ── OT QUEUE ── */}
+        {view==="otqueue"&&(
+          <div>
+            <div style={{fontSize:18,fontWeight:800,color:C.t,marginBottom:3,fontFamily:"Syne"}}>OT Queue</div>
+            <div style={{fontSize:12,color:C.sub,marginBottom:14}}>Emergency → Urgent → Semi-Urgent → Elective</div>
+            {qPts.length===0
+              ?<div style={{...S.card,textAlign:"center",padding:56,color:C.sub}}><div style={{fontSize:40}}>🏥</div><Sp h={12}/>No patients cleared for OT</div>
+              :[...qPts].sort((a,b)=>["Emergency","Urgent","Semi-Urgent","Elective"].indexOf(a.priority)-["Emergency","Urgent","Semi-Urgent","Elective"].indexOf(b.priority)).map((p,i)=>{
+                const pr=PRIO[p.priority];
+                return(
+                  <div key={p.id} onClick={()=>setSel(p)} style={{...S.card,borderLeft:`4px solid ${pr.c}`,cursor:"pointer"}} className="fi">
+                    <div style={{display:"flex",alignItems:"center",gap:12}}>
+                      <div style={{width:36,height:36,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:15,background:`${pr.c}18`,color:pr.c,flexShrink:0}}>{i+1}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:700,color:C.t,fontSize:14}}>{p.name} <span style={S.bdg(p.priority)}>{pr.i}</span></div>
+                        <div style={{fontSize:12,color:C.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.diagnosis} · {p.ward}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+
+        {view==="protocols"&&<ProtoManager protos={protos} onSave={saveProtos}/>}
+      </div>
+
+      {/* ── MODALS ── */}
+      {showAdd&&<PatForm onSave={async p=>{await addPt(p);setShowAdd(false);setView("ward");}} onClose={()=>setShowAdd(false)} protos={protos}/>}
+      {sel&&<PatDetail patient={sel} onClose={()=>setSel(null)} onUpdate={async p=>{await updPt(p);setSel(p);}} protos={protos} user={user}/>}
+    </div>
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
